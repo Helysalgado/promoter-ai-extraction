@@ -46,6 +46,7 @@
   "catalogVersion": "3.0.7",
   "tier": null,
   "optOuts": [
+    "knowledge-sync",
     "trunk-open"
   ],
   "gitPermissions": true,
