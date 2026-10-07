@@ -274,3 +274,94 @@ slug: guided-extraction-baseline
 - blocker: none
 - commits: none
 
+## Increment 3 Git checkpoint — 2026-10-07
+- commit: `1bb5a8129de2656c7e40c92b8422b7423116266a`
+- message: `feat: add persisted evaluation boundary`
+- pushed: `origin/feat/guided-extraction-baseline`
+- trailers: none
+- merge: none
+- operational risk remains: the original checkout must pull/sync this `.gitignore` before `git add .` is used there.
+
+## T027 — 2026-10-07
+- status: complete
+- red: `python -m pytest tests/unit/evaluation/test_comparison.py` failed at collection — `ModuleNotFoundError: No module named 'promoter_ai_extraction.evaluation.comparison'`.
+- green: 14 comparison tests pass after T028.
+- files: `tests/unit/evaluation/test_comparison.py`
+- decision: none
+- blocker: none
+
+## T028 — 2026-10-07
+- status: complete
+- green: normalized-set comparison yields EXACT_MATCH, PARTIAL_MATCH, EXTRA_VALUE, WRONG_VALUE, and MISS with TP/FP/FN. Abstention on a positive target is MISS. Rejected candidates and technical failures contribute no predicted values.
+- files: `src/promoter_ai_extraction/evaluation/comparison.py`
+- decision: when a prediction both misses gold values and adds extras, the row outcome is EXTRA_VALUE, not PARTIAL_MATCH.
+- blocker: none
+
+## T029 — 2026-10-07
+- status: complete
+- red: `python -m pytest tests/unit/evaluation/test_metrics.py` failed at collection — missing `promoter_ai_extraction.evaluation.metrics`.
+- green: 8 metrics/split tests pass after T030.
+- files: `tests/unit/evaluation/test_metrics.py`
+- decision: none
+- blocker: none
+
+## T030 — 2026-10-07
+- status: complete
+- green: per-property precision/recall/F1/exact-row accuracy; texto_explicito and imagen_only recall strata; separate parse-failure and technical-failure counts; coverage = evaluated / (evaluated + technical_failures); paper-grouped split validator rejects shared PMIDs; positive-only limitation text is required on every report.
+- files: `src/promoter_ai_extraction/evaluation/metrics.py`
+- decision: none
+- blocker: none
+
+## T031 — 2026-10-07
+- status: blocked
+- blocker: HUMAN_DECISION_REQUIRED — final headline treatment of technical failures in denominators. Existing separate failure/coverage metrics are implemented and unchanged. This does not block T032–T035. It blocks only the frozen T042 benchmark protocol.
+- files: none
+- decision: none — not invented.
+
+## T032 — 2026-10-07
+- status: complete
+- red: `python -m pytest tests/contract/test_leakage_ordering.py` failed at collection — missing `EvaluationService`.
+- green: 4 contract tests pass after T033. In-memory runs and failed persistence record zero gold-loader calls.
+- files: `tests/contract/test_leakage_ordering.py`
+- decision: none
+- blocker: none
+
+## T033 — 2026-10-07
+- status: complete
+- green: `EvaluationService.evaluate` accepts only `PersistedPredictionRef`, verifies persistence, then opens gold. Direct `ExtractionRun` and `PersistenceFailure` are rejected.
+- files: `src/promoter_ai_extraction/evaluation/service.py`
+- decision: none
+- blocker: none
+
+## T034 — 2026-10-07
+- status: complete
+- red: `python -m pytest tests/integration/test_guided_baseline.py` failed at collection — missing `promoter_ai_extraction.application`.
+- green: parametrized TXT and TEI synthetic flows pass after T035.
+- files: `tests/integration/__init__.py`, `tests/integration/test_guided_baseline.py`
+- decision: none
+- blocker: none
+
+## T035 — 2026-10-07
+- status: complete
+- green: `GuidedBaselineApplication` wires document load → guided extraction → immutable persistence → evaluation. Scripted backend plus synthetic XLSX under `tmp_path`. TXT and TEI both score four exact property rows.
+- files: `src/promoter_ai_extraction/application.py`
+- decision: none
+- blocker: none
+
+## Increment 4 local checkpoint — 2026-10-07
+- scope: T027–T030 and T032–T035; T031 remains HUMAN_DECISION_REQUIRED
+- suite: `./scripts/verify.sh`
+- result: 452 passed
+- commits for this increment: none
+- pushes for this increment: none
+- deferred: T036 and later
+
+## T031 — 2026-10-07 (resolved)
+- status: complete
+- red: not applicable (decision log, not code)
+- green: `02-DOCS/wiki/sdd/decisions.md` records the approved headline protocol
+- files: `02-DOCS/wiki/sdd/decisions.md`
+- decision: end-to-end headline treats technical failure + positive gold as FN; conditioned scientific metrics remain secondary; coverage, technical-failure count/rate, and scientific abstentions stay separate; types never mix (constitution principle 6); positive-only subset limitation remains explicit
+- blocker: none
+- note: T027–T035 code still reports separate failure/coverage counts. Dual-view wiring belongs with the T042 report, not this checkpoint.
+

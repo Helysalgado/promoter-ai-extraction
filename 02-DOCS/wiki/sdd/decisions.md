@@ -139,3 +139,29 @@ Still requiring human decisions, but not blocking TASKS:
 2. whether the final benchmark publishes an additional end-to-end metric that treats technical failures as unrecovered positives, beyond separate technical-failure and evaluated-coverage reporting.
 
 Status: plan drafted. TASKS is structurally unblocked but has not started.
+
+## 2026-10-07 — T031: headline treatment of technical failures
+
+Context: the plan left open whether final reporting adds an end-to-end denominator that treats technical failures as unrecovered positives, or keeps only scientific metrics conditioned on technically evaluable cases.
+
+Options considered:
+
+1. headline = scientific metrics only, on technically evaluable rows; technical failures reported separately;
+2. headline = end-to-end metrics that count a technical failure on a positive gold row as FN; keep a secondary conditioned scientific view;
+3. collapse technical failure into scientific abstention in scoring.
+
+Decision: option 2. Explicit human approval for `guided-extraction-baseline` T031.
+
+For the final benchmark:
+
+1. The end-to-end view treats a technical failure on a positive gold row as an unrecovered positive: it contributes FN to end-to-end recall/F1.
+2. A separate scientific view remains, conditioned on technically evaluable cases.
+3. Always report separately: coverage, technical-failure count, technical-failure rate, and scientific abstentions.
+4. A technical failure is never converted into a scientific abstention, nor the reverse (constitution principle 6).
+5. The system headline is the end-to-end view, because it reflects the full pipeline.
+6. The conditioned scientific view is a secondary diagnostic metric.
+7. The current subset remains a positive-target benchmark. It must not be read as a complete evaluation of negatives, abstentions, or global precision outside that universe.
+
+Why: headline metrics must not hide pipeline failures as if those rows were never attempted, while still preserving a diagnostic view of extraction quality when the pipeline actually produces a scientific result.
+
+Status: T031 resolved. Remaining HUMAN_DECISION_REQUIRED: T036 provider/model selection. T042 must apply both views; T027–T035 keep the existing separate failure/coverage counts until that report is wired.
