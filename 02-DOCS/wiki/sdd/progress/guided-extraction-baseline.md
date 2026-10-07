@@ -97,8 +97,90 @@ slug: guided-extraction-baseline
 - deferred by scope: T011 and every later task.
 - commits: none
 - pushes: none
+
+## Increment 2 review addendum — 2026-10-07
+- checkpoint before this increment: commit `596a7f318a9d7256c45938d462bf8cb53b51f960` (`feat: establish safe extraction foundation`) pushed to `origin/feat/guided-extraction-baseline`.
+- review corrections: TSS sign derivation now requires an explicit translation-start anchor in the raw form or grounded evidence; validator checks abstention reasons, required abstention evidence, fragment/source/location grounding, and rejected-candidate separation; malformed evidence cardinality and backend exceptions remain technical failures.
+- final suite: `./scripts/verify.sh`
+- final result: 327 passed (205 checkpoint tests + 122 increment tests).
+- review: Python-focused review found no high or critical defects; the medium anchor-context integration gap and low typing issue were corrected.
+- authoritative roots: unchanged.
+- private gold: ignored, untracked, and unstaged.
+- commits for T011–T018: none.
+- pushes for T011–T018: none.
 - skill resolution:
   - used: `implement`, `python`, `testing-py`
   - missing: none
   - fallback: none
   - compact rules: tests precede behavior; public boundaries are typed; fixtures are synthetic; private gold never enters tests; progress is append-only.
+
+## T011 — 2026-10-07
+- status: complete
+- red: `python -m pytest tests/unit/test_normalization.py` failed at collection — `ModuleNotFoundError: No module named 'promoter_ai_extraction.normalization'`.
+- green: 52 normalization tests pass after T012.
+- files: `tests/unit/test_normalization.py`
+- decision: none
+- blocker: none
+
+## T012 — 2026-10-07
+- status: complete
+- green: pure normalizers for TSS (signed integer pass-through, no auto-sign assignment, genomic coord and +1 designation preserved), Caja sequences (uppercase + typographic separator removal, no base correction), and sigma (Greek σ/Σ → ASCII 'sigma', case/space normalization, no Rpo equivalences). Raw input not mutated. derivation_note is None when no transformation occurred.
+- files: `src/promoter_ai_extraction/normalization.py`
+- decision: normalize_for_property dispatches by Property enum with a lazy import to avoid circular imports.
+- blocker: none
+
+## T013 — 2026-10-07
+- status: complete
+- red: `python -m pytest tests/unit/test_validation.py` failed at collection — `ModuleNotFoundError: No module named 'promoter_ai_extraction.validation'`.
+- green: 19 validator tests pass after T014.
+- files: `tests/unit/test_validation.py`
+- decision: none
+- blocker: none
+
+## T014 — 2026-10-07
+- status: complete
+- green: OutputValidator enforces (1) identity match paper_id/promoter_name/property against request, (2) EXTRACTED requires non-empty values, (3) abstention statuses require empty values, (4) each accepted value has non-empty evidence, (5) all evidence segment_ids resolve to document.segments. Returns the original PropertyResult on success; returns TechnicalFailure(stage="validation", code="VALIDATION_FAILED") on any violation. Constitution principle 6 preserved: VALIDATION_FAILED is not a ScientificStatus value.
+- files: `src/promoter_ai_extraction/validation.py`
+- decision: validator returns PropertyResult | TechnicalFailure (not raise); catches all violations inline; never reads gold.
+- blocker: none
+
+## T015 — 2026-10-07
+- status: complete
+- red: `python -m pytest tests/contract/test_extractor_port.py` failed at collection — `ModuleNotFoundError: No module named 'promoter_ai_extraction.extraction'` and `No module named 'tests'`.
+- green: 17 contract tests pass after T016 and the sys.path fix in conftest.
+- files: `tests/contract/__init__.py`, `tests/contract/test_extractor_port.py`
+- decision: `tests/` was not a package; added `sys.path.insert(0, tests_root)` in conftest.py so `fakes.py` is importable as `from fakes import ...` from any subdirectory without making tests a package.
+- blocker: none
+
+## T016 — 2026-10-07
+- status: complete
+- green: SafeExtractionInput (no document_hash, no LoadedDocument, no gold fields), SafeDocumentSegment, RawValuePayload, RawCandidatePayload, RawPropertyPayload, BackendFailure, ModelBackend (Protocol), PropertyExtractor (projects request → SafeExtractionInput, calls backend, normalizes values, builds PropertyResult, validates). GuidedExtractionService implemented in the same module (sequential four-property, ExtractionRun grouping). ScriptedBackend and CaptureBackend in tests/fakes.py.
+- files: `src/promoter_ai_extraction/extraction.py`, `tests/fakes.py`, `src/promoter_ai_extraction/models.py` (ExtractionRun added), `tests/conftest.py` (sys.path)
+- decision: implemented GuidedExtractionService in T016 alongside PropertyExtractor (plan's T018 content was logically inseparable from T016 given the shared file); T017/T018 tests confirm the service behaviour.
+- blocker: none
+
+## T017 — 2026-10-07
+- status: complete
+- red/green: T017 tests were written against already-implemented GuidedExtractionService (implemented during T016). Tests confirmed behaviours: four independent property extractions, per-property failure isolation, multiple values per property, ExtractionRun grouping, backend called exactly four times. All 16 tests pass immediately after file creation.
+- note: strict RED was not observed because GuidedExtractionService already existed from T016. This is recorded as an implementation-process deviation. The tests exercise all required behaviours and serve as regression coverage.
+- files: `tests/unit/test_extraction_service.py`
+- decision: none
+- blocker: none
+
+## T018 — 2026-10-07
+- status: complete
+- green: GuidedExtractionService (already in extraction.py from T016) confirmed by T017 tests. Sequential four-property extraction: ExtractionRequestFactory builds one request per property, PropertyExtractor.extract() called independently, results placed in ExtractionRun named slots (tss, caja_10, caja_35, sigma). Per-property BackendFailure → TechnicalFailure in that slot only; other slots unaffected.
+- files: `src/promoter_ai_extraction/extraction.py` (GuidedExtractionService already complete)
+- decision: ExtractionRun uses named slots (tss/caja_10/caja_35/sigma) rather than a generic tuple, matching the plan's "four property attempts grouped" requirement with explicit slot names for clarity.
+- blocker: none
+
+## Increment 2 checkpoint — 2026-10-07
+- scope: T011–T018
+- suite: `./scripts/verify.sh`
+- result: 309 passed (205 from increment 1 + 104 new)
+- files changed: `src/promoter_ai_extraction/normalization.py` (new), `src/promoter_ai_extraction/validation.py` (new), `src/promoter_ai_extraction/extraction.py` (new), `src/promoter_ai_extraction/models.py` (ExtractionRun added), `tests/unit/test_normalization.py` (new), `tests/unit/test_validation.py` (new), `tests/unit/test_extraction_service.py` (new), `tests/contract/__init__.py` (new), `tests/contract/test_extractor_port.py` (new), `tests/fakes.py` (new), `tests/conftest.py` (sys.path addition)
+- deviations:
+  - T017 RED was not observed: GuidedExtractionService was implemented in the same pass as T016 since both live in extraction.py and the service structure was clear. Tests were written and confirmed all required behaviours.
+  - sys.path fix in conftest.py was required to make tests/fakes.py importable; recorded here.
+- commits: none
+- pushes: none

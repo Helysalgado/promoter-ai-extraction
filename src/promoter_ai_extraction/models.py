@@ -272,3 +272,44 @@ class TechnicalFailure:
 #: A technical failure coexists with valid results in the same run but never
 #: becomes an accepted value or a scientific abstention.
 PropertyAttempt = PropertyResult | TechnicalFailure
+
+
+# ---------------------------------------------------------------------------
+# ExtractionRun — four property attempts grouped under one run (T018)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractionRun:
+    """Four independent property attempts grouped for one paper × promoter pair.
+
+    Attributes
+    ----------
+    run_id:
+        Unique identifier for this extraction run (e.g. a UUID or timestamp-
+        based string).
+    paper_id:
+        The paper identifier shared by all four attempts.
+    promoter_name:
+        The promoter name shared by all four attempts.
+    tss:
+        The extraction attempt for :attr:`~Property.TSS`.
+    caja_10:
+        The extraction attempt for :attr:`~Property.CAJA_10`.
+    caja_35:
+        The extraction attempt for :attr:`~Property.CAJA_35`.
+    sigma:
+        The extraction attempt for :attr:`~Property.FACTOR_SIGMA`.
+
+    Each slot holds either a :class:`PropertyResult` (scientific conclusion)
+    or a :class:`TechnicalFailure` (non-scientific processing failure).
+    A failure in one slot does not affect the other three slots.
+    """
+
+    run_id: str
+    paper_id: str
+    promoter_name: str
+    tss: PropertyAttempt
+    caja_10: PropertyAttempt
+    caja_35: PropertyAttempt
+    sigma: PropertyAttempt
