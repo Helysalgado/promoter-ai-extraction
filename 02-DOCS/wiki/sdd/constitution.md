@@ -1,18 +1,18 @@
 ---
 type: constitution
 title: promoter-ai-extraction — Constitution
-description: Draft non-negotiable principles for every rsc-sdd phase. Not ratified.
+description: The non-negotiable principles every rsc-sdd phase obeys.
 tags: [sdd, constitution]
-timestamp: 2026-10-07T00:37:54Z
+timestamp: 2026-10-07T00:49:57Z
 topic: sdd
 version: v1.0.0
-status: draft
+status: ratified
 ---
 
 # promoter-ai-extraction — Constitution
 
-> Version: v1.0.0 · Ratified: pending · Last amended: 2026-10-06
-> Status: **draft**. Not in effect until explicit human ratification.
+> Version: v1.0.0 · Ratified: 2026-10-06 · Last amended: 2026-10-06
+> Status: **ratified**. In effect.
 > Property-specific rules stay in the six root contracts and in feature specifications.
 
 ## 1. Authority
@@ -71,3 +71,4 @@ Principles 3 through 8 apply once a feature spec exists.
 |------|---------|--------|-----|
 | 2026-10-06 | v1.0.0 | Drafted. Not ratified. Not in effect. | SDD foundation only. Human ratification is still required. |
 | 2026-10-06 | v1.0.0 | Pre-ratification revision. Removed stack canon, quality bar, and git-authorship principles. Narrowed the decision-log rule. Removed the concrete ignore-path sentence from the privacy principle. Renumbered the remaining principles. Still draft. Not ratified. | Human review: the constitution keeps durable invariants only. The technical snapshot stays in `config.yaml`. |
+| 2026-10-06 | v1.0.0 | Ratified. Now in effect. No change to the wording of principles 1–11. | Explicit human approval of the current text. |

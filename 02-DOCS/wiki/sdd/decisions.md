@@ -41,3 +41,18 @@ Still unresolved, and not decided here:
 
 Why: human review asked the constitution to keep durable project invariants and to drop accidental technical state.
 Status: draft. Not ratified. Not in effect.
+
+## 2026-10-06 — Constitution v1.0.0 ratified
+
+Options considered: ratify the current text, amend it further, or reject it.
+Decision: ratify `02-DOCS/wiki/sdd/constitution.md` as v1.0.0.
+Why: explicit human approval of the current text. Principles 1–11 are unchanged.
+Status: ratified. In effect.
+
+Still unresolved, and not decided by this ratification:
+
+- canonical banned-field list;
+- treatment of `Sin_dato_en_RegulonDB`;
+- treatment of `Técnica_confirmada_manualmente`;
+- treatment of `Año_confirmado`;
+- concrete `.gitignore` strategy for future gold files.
