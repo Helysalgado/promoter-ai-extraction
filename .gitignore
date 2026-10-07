@@ -19,6 +19,15 @@ wheels/
 data/raw/
 data/private/
 
+# Real gold workbook — never commit (constitution principle 9; T001)
+# Narrow path so tests/fixtures/synthetic_gold.xlsx remains versionable.
+02-DOCS/data/SUBSET_GOLD.xlsx
+
+# Local generated prediction/output directories (constitution principle 9; T001)
+predictions/
+outputs/
+runs/
+
 # rsc local state (hooks, seals, logs) and managed skill links — machine-local
 .rsc/
 .cursor/rules/analyze.mdc
@@ -74,3 +83,7 @@ data/private/
 .cursor/commands/specify.md
 .cursor/commands/tasks.md
 .cursor/commands/verify.md
+
+# rsc local state (hooks, seals, logs) and managed skill links — machine-local
+.cursor/rules/testing-py.mdc
+.cursor/commands/test-coverage.md

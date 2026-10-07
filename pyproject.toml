@@ -1,7 +1,30 @@
 [project]
 name = "promoter-ai-extraction"
 version = "0.1.0"
-description = "Add your description here"
+description = "Leakage-safe guided extraction and evaluation of bacterial promoter properties from scientific literature."
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "openpyxl>=3.1",
+    "defusedxml>=0.7",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/promoter_ai_extraction"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers --strict-config"
+markers = [
+    "slow: deselect with -m 'not slow'",
+    "integration: touches a real boundary",
+]

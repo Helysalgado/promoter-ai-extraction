@@ -30,6 +30,7 @@
     "specify",
     "suggest",
     "tasks",
+    "testing-py",
     "ui-engineering",
     "unslop",
     "verify",
@@ -46,8 +47,7 @@
   "catalogVersion": "3.0.7",
   "tier": null,
   "optOuts": [
-    "knowledge-sync",
-    "trunk-open"
+    "knowledge-sync"
   ],
   "gitPermissions": true,
   "onboarding": {
@@ -813,6 +813,11 @@
       "02-DOCS/wiki/harness/decisions.md": "c296019b4c3c8b80e7b6b15ed7ffd632576e76f00697361b08f5cf4e5d4fac68",
       "02-DOCS/wiki/harness/installation-plan.md": "e223bf7bab96361f33fb80186147564fa6caefe58b851e555bf1f138c5f00395",
       "02-DOCS/wiki/harness/user-profile.md": "c6d557832758d5210453261fa48987e1fa1fbf1293ce64cb60f2f1b81e9ab986"
+    },
+    "maintenanceDrift": {
+      "action": "add testing-py",
+      "recordedAt": "2026-10-07T12:41:50.988Z",
+      "requiresReassessment": true
     }
   }
 }
