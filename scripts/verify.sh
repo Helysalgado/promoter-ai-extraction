@@ -10,11 +10,13 @@ cd "$REPO_ROOT"
 echo "=== promoter-ai-extraction — verify gate ==="
 echo "Working directory: $REPO_ROOT"
 
-# Safety: refuse to touch the real gold workbook.
-if git check-ignore -q "02-DOCS/data/SUBSET_GOLD.xlsx" 2>/dev/null; then
-    echo "[ok] Real gold workbook is git-ignored."
+# Safety: refuse to version real papers, gold, or derived local data/.
+if git check-ignore -q "data/" 2>/dev/null \
+    && git check-ignore -q "02-DOCS/data/" 2>/dev/null \
+    && git check-ignore -q "02-DOCS/data/SUBSET_GOLD.xlsx" 2>/dev/null; then
+    echo "[ok] Root data/, 02-DOCS/data/, and the real gold workbook are git-ignored."
 else
-    echo "[WARN] Real gold workbook is NOT git-ignored — check .gitignore (T001)."
+    echo "[WARN] Local data/ or the real gold workbook is NOT git-ignored — check .gitignore."
 fi
 
 # Integrity: synthetic fixtures must remain versionable.

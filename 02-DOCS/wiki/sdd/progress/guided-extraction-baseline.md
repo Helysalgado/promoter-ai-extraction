@@ -184,3 +184,93 @@ slug: guided-extraction-baseline
   - sys.path fix in conftest.py was required to make tests/fakes.py importable; recorded here.
 - commits: none
 - pushes: none
+
+## Increment 2 Git checkpoint — 2026-10-07
+- commit: `06ff0c41fe7f5649b13e690188862db60a86526c`
+- message: `feat: add guided property extraction`
+- pushed: `origin/feat/guided-extraction-baseline`
+
+## T019 — 2026-10-07
+- status: complete
+- red: schema/serialization tests failed until `promoter_ai_extraction.persistence` existed.
+- green: schema version 1 round-trips ExtractionRun slots, metadata, and enum strings.
+- files: `tests/unit/test_prediction_schema.py`
+- decision: persistence metadata lives on the serialized record, not on ExtractionRun.
+- blocker: none
+
+## T020 — 2026-10-07
+- status: complete
+- green: deterministic JSON serialization/deserialization for schema version 1.
+- files: `src/promoter_ai_extraction/persistence.py`
+- decision: none
+- blocker: none
+
+## T021 — 2026-10-07
+- status: complete
+- red: store tests failed until PredictionStore write/load behavior existed.
+- green: atomic write, no overwrite, hash verification, corruption, and run isolation.
+- files: `tests/unit/test_prediction_store.py`
+- decision: none
+- blocker: none
+
+## T022 — 2026-10-07
+- status: complete
+- green: `PredictionStore.save` returns `PersistedPredictionRef`; `load_verified` returns `VerifiedPersistedPrediction` or `PersistenceFailure`.
+- files: `src/promoter_ai_extraction/persistence.py`
+- decision: none
+- blocker: none
+
+## T023 — 2026-10-07
+- status: complete
+- red: gold loader and boundary tests failed until the evaluation package existed.
+- green: verified-persistence gate, synthetic header/key loading, technical workbook failures, extractor import isolation.
+- files: `tests/unit/evaluation/test_gold_loader.py`, `tests/contract/test_gold_boundary.py`, `tests/synthetic_gold.py`
+- decision: none
+- blocker: none
+
+## T024 — 2026-10-07
+- status: complete
+- green: `GoldLoader.load` accepts only `VerifiedPersistedPrediction`, then reads a local XLSX read-only/data-only.
+- files: `src/promoter_ai_extraction/evaluation/gold_loader.py`, `src/promoter_ai_extraction/evaluation/__init__.py`
+- decision: none
+- blocker: none
+
+## T025 — 2026-10-07
+- status: complete
+- red: parser tests failed until `GoldParser` existed.
+- green: single values, Caja -10 ` + `, Caja -35 newline, TSS sign, sigma typography, dedup provenance, PARSE_ERROR / NEEDS_REVIEW.
+- files: `tests/unit/evaluation/test_gold_parser.py`
+- decision: none
+- blocker: none
+
+## T026 — 2026-10-07
+- status: complete
+- green: current-workset parser preserves raw, tokenizes only observed encodings, normalizes per property, fail-closes unknown syntax.
+- files: `src/promoter_ai_extraction/evaluation/gold_parser.py`
+- decision: none
+- blocker: none
+
+## Increment 3 local checkpoint — 2026-10-07
+- scope: T019–T026
+- suite: `./scripts/verify.sh`
+- result: 424 passed
+- persist-before-gold: `tests/contract/test_gold_boundary.py::test_persist_verified_reference_then_gold_access`
+- commits for T019–T026: none
+- pushes for T019–T026: none
+- deferred: T027 and later
+
+## Data-ignore tightening — 2026-10-07
+- status: complete (uncommitted; fold into the T019–T026 checkpoint)
+- files: `.gitignore`, `scripts/verify.sh`
+- decision: ignore repo-root `/data/` and `/02-DOCS/data/` as directories. Do not use `*.txt`, `*.xml`, or `*.xlsx`. Synthetic fixtures stay versionable under `tests/fixtures/` or `tmp_path`.
+- evidence:
+  - `git ls-files -- data/** 02-DOCS/data/**` is empty in this worktree and in the original checkout (nothing to `git rm`).
+  - `git diff --cached` lists no path under `data/` or `02-DOCS/data/`.
+  - `git check-ignore -v` maps `data/gold-pmid-tei-txt/*` to `.gitignore:22:/data/` and `02-DOCS/data/gold-pmid-tei-txt/*` to `.gitignore:26:/02-DOCS/data/`.
+  - 152 on-disk TEI/TXT files under `02-DOCS/data/gold-pmid-tei-txt/` are ignored (76 xml + 76 txt). Repo-root `data/` is absent on disk.
+  - `tests/fixtures/synthetic_gold.xlsx` is not ignored. `./scripts/verify.sh`: 424 passed.
+- note: the original checkout still has the old `data/raw/` + `data/private/` rules, so `02-DOCS/data/` (except `SUBSET_GOLD.xlsx`) remains untracked-visible there until this checkpoint lands. No `git rm` was run.
+- operational risk: the original checkout at the repo root must sync this `.gitignore` (both `/data/` and `/02-DOCS/data/`) before it is used again. Until then, `git add .` there can still include `02-DOCS/data/` papers, gold, and derived files. This worktree does not modify that checkout.
+- blocker: none
+- commits: none
+
