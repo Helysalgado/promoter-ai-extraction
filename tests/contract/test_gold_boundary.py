@@ -25,6 +25,8 @@ _EXTRACTION_MODULES = (
     "normalization.py",
     "validation.py",
     "persistence.py",
+    "backends/__init__.py",
+    "backends/openai_backend.py",
 )
 
 

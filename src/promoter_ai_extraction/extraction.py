@@ -272,9 +272,11 @@ class PropertyExtractor:
             )
 
         if isinstance(raw, BackendFailure):
+            scientific_codes = {status.value for status in ScientificStatus}
+            code = raw.code if raw.code and raw.code not in scientific_codes else "BACKEND_ERROR"
             return TechnicalFailure(
                 stage="extraction",
-                code="BACKEND_ERROR",
+                code=code,
                 message=f"Backend reported a failure: {raw.message}",
                 cause=raw.code,
             )

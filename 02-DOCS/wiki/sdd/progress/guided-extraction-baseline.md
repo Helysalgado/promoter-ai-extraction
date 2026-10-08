@@ -374,3 +374,29 @@ slug: guided-extraction-baseline
 - blocker: none
 - note: T037–T038 were not started. The `openai` SDK is not added in this step.
 
+## T037 — 2026-10-08
+- status: complete
+- red: `python -m pytest tests/contract/test_real_backend_adapter.py` failed at collection — `promoter_ai_extraction.backends` did not exist
+- green: `uv run pytest tests/contract/test_real_backend_adapter.py tests/contract/test_extractor_port.py tests/contract/test_gold_boundary.py` — 39 passed; fake Responses client; no network
+- files: `tests/contract/test_real_backend_adapter.py`
+- decision: none
+- blocker: none
+- note: not committed; held for review with T038
+
+## T038 — 2026-10-08
+- status: complete
+- green: `uv sync --frozen` audited 23 packages; `./scripts/verify.sh` — 464 passed
+- files: `src/promoter_ai_extraction/backends/__init__.py`, `src/promoter_ai_extraction/backends/openai_backend.py`, `src/promoter_ai_extraction/extraction.py`, `tests/contract/test_gold_boundary.py`, `pyproject.toml`, `uv.lock`
+- decision: official `openai==3.26.1`; Responses API `text.format` json_schema strict; published gpt-6.1-sol window 1,050,000 context / 128,000 max output (https://developers.openai.com/api/docs/models/gpt-6.1-sol); preflight uses Unicode length as a conservative token upper bound; `DOCUMENT_TOO_LARGE` without truncation; optional payload fields encoded as required+nullable; `PropertyExtractor` preserves non-scientific `BackendFailure.code`; document hash stays on persistence/`LoadedDocument`, not in the prompt
+- blocker: none
+- note: no live `OPENAI_API_KEY` call; T037–T038 remain uncommitted pending review
+
+## T037–T038 review fixes — 2026-10-08
+- status: complete
+- red: 9 new adapter assertions failed (truncation, extra fields, non-string value_raw, incomplete JSON, response.error, structured context error, injected environ api_key, output-budget preflight)
+- green: `uv run pytest tests/contract/test_real_backend_adapter.py tests/contract/test_extractor_port.py tests/contract/test_gold_boundary.py` — 46 passed; `./scripts/verify.sh` — 471 passed
+- files: `src/promoter_ai_extraction/backends/openai_backend.py`, `tests/contract/test_real_backend_adapter.py`
+- decision: character-length fail-closed budget = published context − max output − measured schema JSON; not a tokenizer. Responses `status`/`error`/`incomplete_details` inspected before scientific accept. `OpenAI(api_key=secret)` from `self._environ`. `truncation="disabled"` explicit.
+- blocker: none
+- note: `document_hash` remains None in adapter metadata for later persist wiring; no live API call; uncommitted
+
