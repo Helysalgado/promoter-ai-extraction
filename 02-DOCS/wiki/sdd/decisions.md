@@ -165,3 +165,74 @@ For the final benchmark:
 Why: headline metrics must not hide pipeline failures as if those rows were never attempted, while still preserving a diagnostic view of extraction quality when the pipeline actually produces a scientific result.
 
 Status: T031 resolved. Remaining HUMAN_DECISION_REQUIRED: T036 provider/model selection. T042 must apply both views; T027–T035 keep the existing separate failure/coverage counts until that report is wired.
+
+## 2026-10-08 — T036: OpenAI Responses API backend for the real baseline
+
+Context: the plan left the real extractor adapter blocked until provider, model, credential source, structured-output mode, context handling, and reproducibility settings were chosen.
+
+Options considered:
+
+1. hosted OpenAI SDK behind the existing `ModelBackend` port;
+2. an institution-approved non-OpenAI endpoint;
+3. a local model;
+4. a multi-provider layer (LiteLLM, LangChain, or automatic fallback).
+
+Decision: option 1. Explicit human approval for `guided-extraction-baseline` T036.
+
+| Item | Choice |
+|---|---|
+| Provider | OpenAI |
+| API / interface | Responses API (`/v1/responses`) |
+| Initial model | `gpt-6.1-sol` |
+| Credential | `OPENAI_API_KEY` from the process environment only |
+| Structured output | Responses API JSON Schema (`text.format`, `type=json_schema`, `strict=true`) mapped explicitly onto `RawPropertyPayload` |
+| Fallback | none; a `gpt-6.1-sol` failure is a technical failure |
+| Adapter shape | `PropertyExtractor` → `ModelBackend` → `OpenAIModelBackend` |
+
+Credential rules:
+
+- Read the key only from the environment variable `OPENAI_API_KEY`.
+- Do not store it in code, versioned configuration, logs, prediction artifacts, or SDD reports.
+
+Structured output and errors:
+
+- The adapter must require schema-constrained output compatible with `RawPropertyPayload` / `PropertyExtractor` / `OutputValidator`.
+- Do not accept free text and then guess its structure.
+- Convert provider error, timeout, incomplete response, schema violation, structured-output failure, and adapter parse failure into `BackendFailure` → `TechnicalFailure`.
+- Never convert those events into a scientific abstention (constitution principle 6).
+
+Prompt:
+
+- Build the prompt only from `SafeExtractionInput`.
+- Do not change scientific extraction rules.
+- Do not include gold, `GT_para_referencia`, curator-only modality, split, metrics, expected target, `SUBSET_GOLD.xlsx`, or other evaluator-only fields.
+
+Context limit:
+
+- Do not silently truncate the supplied document.
+- If the SafeExtractionInput cannot be submitted within the published context window of `gpt-6.1-sol`, return technical failure `DOCUMENT_TOO_LARGE`.
+- A numeric token cap is not frozen here; T038 must use the model's published window and fail closed.
+
+Reproducibility metadata (no secrets) on each real run, via the existing persistence `system_fingerprint` / run metadata:
+
+- `provider = openai`
+- `model = gpt-6.1-sol`
+- `api = responses`
+- prompt/version identifier
+- payload schema version
+- generation/configuration parameters actually used
+- existing document SHA-256
+- run timestamp
+- existing software/version metadata when the architecture already records it
+- provider snapshot/model id from the API response, when present
+
+Architecture constraints for T037–T038:
+
+- Do not couple `GuidedExtractionService` to the OpenAI SDK.
+- Do not introduce LiteLLM, LangChain, an agent framework, multi-provider fallback, RAG, or FastAPI.
+- Keep `ModelBackend` as the extension point for future backends.
+- Adding the official `openai` Python SDK is deferred to T038; it is not a current runtime dependency.
+
+Why: this is the smallest hosted adapter that satisfies structured-output enforcement, env-only credentials, and the existing port without mixing models inside one benchmark.
+
+Status: T036 resolved. T037–T038 remain unimplemented.

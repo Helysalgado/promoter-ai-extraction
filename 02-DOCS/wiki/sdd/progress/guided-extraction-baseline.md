@@ -365,3 +365,12 @@ slug: guided-extraction-baseline
 - blocker: none
 - note: T027–T035 code still reports separate failure/coverage counts. Dual-view wiring belongs with the T042 report, not this checkpoint.
 
+## T036 — 2026-10-08
+- status: complete
+- red: not applicable (decision log, not code)
+- green: `02-DOCS/wiki/sdd/decisions.md` records provider OpenAI, Responses API, model `gpt-6.1-sol`, env-only `OPENAI_API_KEY`, strict JSON-schema structured output, no fallback, fail-closed context handling, and reproducibility metadata
+- files: `02-DOCS/wiki/sdd/decisions.md`
+- decision: `PropertyExtractor` → `ModelBackend` → `OpenAIModelBackend`; prompt from `SafeExtractionInput` only; provider/schema/parse failures are technical failures
+- blocker: none
+- note: T037–T038 were not started. The `openai` SDK is not added in this step.
+
