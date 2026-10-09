@@ -437,3 +437,21 @@ slug: guided-extraction-baseline
 - blocker: none
 - note: uncommitted. T042 not started.
 
+## T042 — 2026-10-09 (code + synthetic tests; live run deferred)
+- status: partial — CLI, fingerprints, dual-view JSON report, and synthetic tests are green. The live done-check (real local papers, human-authored manifest, OpenAI) is not started.
+- red: `tests/unit/evaluation/test_dual_view.py` and `tests/integration/test_baseline_cli.py` failed at collection (`headline_property_counts` / `main` missing).
+- green: `uv run pytest tests/unit/evaluation/test_dual_view.py tests/integration/test_baseline_cli.py tests/contract/test_real_backend_adapter.py tests/integration/test_baseline_runner.py` — 42 passed; `./scripts/verify.sh` — 506 passed. No live OpenAI.
+- files: `src/promoter_ai_extraction/baseline.py`, `src/promoter_ai_extraction/application.py`, `src/promoter_ai_extraction/backends/openai_backend.py`, `src/promoter_ai_extraction/evaluation/metrics.py`, `src/promoter_ai_extraction/evaluation/report.py`, `src/promoter_ai_extraction/evaluation/service.py`, `tests/unit/evaluation/test_dual_view.py`, `tests/integration/test_baseline_cli.py`, `tests/contract/test_real_backend_adapter.py`
+- decision: `python -m promoter_ai_extraction.baseline` with `--manifest/--documents/--gold/--predictions/--report`. Reuses `BaselineRunner` and `GuidedBaselineApplication`. Persistence `system_fingerprint` stores `common` generation metadata plus per-property `model_snapshot`/`system_fingerprint`; `document_hash` comes from `LoadedDocument` at save time, never from the adapter. Report headline is `end_to_end` (TF on positive gold adds FN); `scientific` is diagnostic and does not count TF as abstention. CLI maps `BoundaryViolation` and non-`EvaluationReport` outcomes to exit 1; argparse missing flags stay non-zero. A TF inside a persisted four-property run still yields exit 0 with both views in JSON.
+- blocker: live T042 done-check needs a human-authored ignored case list, a cost cap, and `OPENAI_API_KEY`. Not configured in this increment.
+- note: no `SUBSET_GOLD.xlsx`, no real TEI/TXT, no PMID selection, no credentials, no T043+. Uncommitted.
+
+## T042 review follow-up — 2026-10-09
+- status: complete (code + synthetic tests). Live done-check still deferred.
+- red: dual-view/CLI tests failed for missing `technical_failure_gold_values`, missing `technical_failure_rate`, multi-value FN=2, and missing-key CLI still exiting 0.
+- green: focused dual-view + CLI + persistence + metrics 57 passed; `./scripts/verify.sh` — 510 passed. No live OpenAI.
+- files: `02-DOCS/wiki/sdd/decisions.md`, `src/promoter_ai_extraction/evaluation/metrics.py`, `src/promoter_ai_extraction/evaluation/service.py`, `src/promoter_ai_extraction/evaluation/report.py`, `src/promoter_ai_extraction/baseline.py`, `tests/unit/evaluation/test_dual_view.py`, `tests/integration/test_baseline_cli.py`
+- decision: T031 clarified — TF on multi-value gold adds FN per gold value; `technical_failures` stays one attempt. CLI preflights `OPENAI_API_KEY` before constructing `OpenAIModelBackend`. Report emits `technical_failure_rate = TF / (evaluated_rows + TF)`.
+- blocker: live T042 still needs a human case list, cost cap, and credentials. Not run here.
+- note: six root contracts unchanged. Uncommitted. No T043.
+

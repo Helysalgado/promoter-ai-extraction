@@ -94,6 +94,8 @@ class EvaluationService:
         comparisons = []
         parse_failures = 0
         technical_failures = 0
+        tf_by_property: dict[Property, int] = {prop: 0 for prop in Property}
+        tf_gold_values: dict[Property, int] = {prop: 0 for prop in Property}
         for record in records:
             if record.paper_id != run.paper_id or record.promoter_name != run.promoter_name:
                 continue
@@ -105,6 +107,8 @@ class EvaluationService:
             predicted = predicted_value_set(attempt)
             if predicted is None:
                 technical_failures += 1
+                tf_by_property[record.property] += 1
+                tf_gold_values[record.property] += len(parsed.gold_value_set)
                 continue
             assert isinstance(parsed, ParsedGoldValue)
             comparisons.append(
@@ -121,6 +125,8 @@ class EvaluationService:
             comparisons,
             parse_failures=parse_failures,
             technical_failures=technical_failures,
+            technical_failures_by_property=tf_by_property,
+            technical_failure_gold_values=tf_gold_values,
         )
 
 

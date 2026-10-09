@@ -16,6 +16,7 @@ __all__ = [
     "PropertyMetrics",
     "SplitValidationError",
     "aggregate_report",
+    "headline_property_counts",
     "validate_paper_grouped_splits",
 ]
 
@@ -48,7 +49,11 @@ class EvaluationReport:
     evaluated_rows: int
     parse_failures: int
     technical_failures: int
+    technical_failures_by_property: dict[Property, int]
+    technical_failure_gold_values: dict[Property, int]
+    scientific_abstentions: int
     coverage: float
+    technical_failure_rate: float
     limitation_note: str
     rows: tuple[RowComparison, ...]
 
@@ -72,6 +77,8 @@ def aggregate_report(
     *,
     parse_failures: int,
     technical_failures: int,
+    technical_failures_by_property: dict[Property, int] | None = None,
+    technical_failure_gold_values: dict[Property, int] | None = None,
 ) -> EvaluationReport:
     scored = tuple(rows)
     by_property: dict[Property, PropertyMetrics] = {}
@@ -80,15 +87,61 @@ def aggregate_report(
     evaluated = len(scored)
     coverage_denom = evaluated + technical_failures
     coverage = evaluated / coverage_denom if coverage_denom else 0.0
+    rate = technical_failures / coverage_denom if coverage_denom else 0.0
+    tf_by = {prop: 0 for prop in Property}
+    if technical_failures_by_property is not None:
+        for prop, count in technical_failures_by_property.items():
+            tf_by[prop] = count
+    tf_gold = {prop: 0 for prop in Property}
+    if technical_failure_gold_values is not None:
+        for prop, count in technical_failure_gold_values.items():
+            tf_gold[prop] = count
+    else:
+        tf_gold = dict(tf_by)
+    abstentions = sum(1 for row in scored if not row.predicted_value_set)
     return EvaluationReport(
         by_property=by_property,
         evaluated_rows=evaluated,
         parse_failures=parse_failures,
         technical_failures=technical_failures,
+        technical_failures_by_property=tf_by,
+        technical_failure_gold_values=tf_gold,
+        scientific_abstentions=abstentions,
         coverage=coverage,
+        technical_failure_rate=rate,
         limitation_note=POSITIVE_ONLY_LIMITATION,
         rows=scored,
     )
+
+
+def headline_property_counts(
+    scientific: PropertyMetrics,
+    *,
+    technical_failures: int,
+    unrecovered_gold_values: int | None = None,
+) -> dict[str, int | float]:
+    """End-to-end counts: a technical failure adds FN per valid gold value.
+
+    ``technical_failures`` stays a row/attempt count. ``unrecovered_gold_values``
+    is the value-level FN contribution. Scientific abstentions stay in
+    ``scientific.fn``. Types never mix.
+    """
+    missing_values = (
+        technical_failures if unrecovered_gold_values is None else unrecovered_gold_values
+    )
+    tp = scientific.tp
+    fp = scientific.fp
+    fn = scientific.fn + missing_values
+    n_targets = scientific.n_targets + technical_failures
+    return {
+        "tp": tp,
+        "fp": fp,
+        "fn": fn,
+        "n_targets": n_targets,
+        "precision": _ratio(tp, tp + fp),
+        "recall": _ratio(tp, tp + fn),
+        "f1": _f1(tp, fp, fn),
+    }
 
 
 def validate_paper_grouped_splits(

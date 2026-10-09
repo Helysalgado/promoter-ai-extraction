@@ -155,10 +155,14 @@ class OpenAIModelBackend:
     ) -> None:
         self._client = client
         self._environ = environ if environ is not None else os.environ
-        self._metadata: dict[str, Any] | None = None
+        self._common: dict[str, Any] | None = None
+        self._by_property: dict[str, dict[str, Any]] = {}
 
     def reproducibility_metadata(self) -> dict[str, Any]:
-        return dict(self._metadata or {})
+        return {
+            "common": dict(self._common or {}),
+            "by_property": {key: dict(value) for key, value in self._by_property.items()},
+        }
 
     def generate(
         self, safe_input: SafeExtractionInput
@@ -177,7 +181,12 @@ class OpenAIModelBackend:
             )
 
         request = _build_request(prompt)
-        self._metadata = _fingerprint(request, snapshot=None, system_fingerprint=None)
+        self._record_fingerprint(
+            safe_input.property.value,
+            request,
+            snapshot=None,
+            system_fingerprint=None,
+        )
 
         try:
             client = self._client or _live_client(secret)
@@ -189,7 +198,8 @@ class OpenAIModelBackend:
 
         snapshot = getattr(response, "model", None)
         fingerprint = getattr(response, "system_fingerprint", None)
-        self._metadata = _fingerprint(
+        self._record_fingerprint(
+            safe_input.property.value,
             request,
             snapshot=snapshot if isinstance(snapshot, str) else None,
             system_fingerprint=fingerprint if isinstance(fingerprint, str) else None,
@@ -211,6 +221,20 @@ class OpenAIModelBackend:
                 message=_redact(mapped.message, secret),
             )
         return mapped
+
+    def _record_fingerprint(
+        self,
+        property_label: str,
+        request: dict[str, Any],
+        *,
+        snapshot: str | None,
+        system_fingerprint: str | None,
+    ) -> None:
+        recorded = _fingerprint(
+            request, snapshot=snapshot, system_fingerprint=system_fingerprint
+        )
+        self._common = recorded["common"]
+        self._by_property[property_label] = recorded["by_property"]
 
 
 def _live_client(secret: str) -> Any:
@@ -265,24 +289,25 @@ def _fingerprint(
 ) -> dict[str, Any]:
     fmt = request["text"]["format"]
     return {
-        "provider": PROVIDER,
-        "model": MODEL_ID,
-        "api": API_NAME,
-        "prompt_version": PROMPT_VERSION,
-        "schema_version": SCHEMA_VERSION,
-        "generation": {
-            "max_output_tokens": request["max_output_tokens"],
-            "text_format": fmt["type"],
-            "strict": fmt["strict"],
-            "store": request["store"],
-            "truncation": request["truncation"],
-            "input_char_budget": INPUT_CHAR_BUDGET,
+        "common": {
+            "provider": PROVIDER,
+            "model": MODEL_ID,
+            "api": API_NAME,
+            "prompt_version": PROMPT_VERSION,
+            "schema_version": SCHEMA_VERSION,
+            "generation": {
+                "max_output_tokens": request["max_output_tokens"],
+                "text_format": fmt["type"],
+                "strict": fmt["strict"],
+                "store": request["store"],
+                "truncation": request["truncation"],
+                "input_char_budget": INPUT_CHAR_BUDGET,
+            },
         },
-        "model_snapshot": snapshot,
-        "system_fingerprint": system_fingerprint,
-        # SafeExtractionInput does not carry the hash. Persistence already
-        # stores LoadedDocument.document_hash; callers merge that field.
-        "document_hash": None,
+        "by_property": {
+            "model_snapshot": snapshot,
+            "system_fingerprint": system_fingerprint,
+        },
     }
 
 

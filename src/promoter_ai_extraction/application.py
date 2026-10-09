@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
+from promoter_ai_extraction import __version__
 from promoter_ai_extraction.boundary import ExtractionRequestFactory
 from promoter_ai_extraction.documents import DocumentLoader, DocumentSource, LoadedDocument
 from promoter_ai_extraction.evaluation.metrics import EvaluationReport
@@ -19,6 +21,7 @@ class GuidedBaselineApplication:
     """Orchestrates one synthetic paper × promoter run without a UI or API."""
 
     def __init__(self, backend: ModelBackend) -> None:
+        self._backend = backend
         self._documents = DocumentLoader()
         extractor = PropertyExtractor(backend=backend, validator=OutputValidator())
         self._extraction = GuidedExtractionService(extractor, ExtractionRequestFactory())
@@ -45,7 +48,33 @@ class GuidedBaselineApplication:
             run_id=run_id,
         )
         store = PredictionStore(prediction_dir)
-        saved = store.save(run, document_hash=loaded.document_hash)
+        saved = store.save(
+            run,
+            document_hash=loaded.document_hash,
+            system_fingerprint=_run_fingerprint(self._backend, loaded.document_hash),
+        )
         if isinstance(saved, PersistenceFailure):
             return saved
         return EvaluationService(store).evaluate(saved, gold_path)
+
+
+def _run_fingerprint(backend: ModelBackend, document_hash: str) -> dict[str, Any]:
+    raw: object = {}
+    getter = getattr(backend, "reproducibility_metadata", None)
+    if callable(getter):
+        raw = getter()
+    common: dict[str, Any] = {}
+    by_property: dict[str, Any] = {}
+    if isinstance(raw, dict):
+        maybe_common = raw.get("common")
+        maybe_by_property = raw.get("by_property")
+        if isinstance(maybe_common, dict):
+            common = dict(maybe_common)
+        if isinstance(maybe_by_property, dict):
+            by_property = dict(maybe_by_property)
+    return {
+        "common": common,
+        "by_property": by_property,
+        "document_hash": document_hash,
+        "software_version": __version__,
+    }

@@ -236,3 +236,22 @@ Architecture constraints for T037–T038:
 Why: this is the smallest hosted adapter that satisfies structured-output enforcement, env-only credentials, and the existing port without mixing models inside one benchmark.
 
 Status: T036 resolved. T037–T038 remain unimplemented.
+
+## 2026-10-09 — T031 clarification: technical failure on multi-value gold
+
+Context: T031 option 2 treated a technical failure on a positive gold **row** as one end-to-end FN. Value-level scoring already uses `FN = |gold − prediction|` (evaluation-contract §14). On multi-value gold those units diverged: an abstention contributed `|gold|` FN, while a TIMEOUT contributed 1 FN.
+
+This clarification does not edit the six root contracts. evaluation-contract §14 already defines value-level FN. The evaluation unit remains `paper × promoter × property`. Sets remain the comparison method. Scientific abstention semantics are unchanged.
+
+Decision: explicit human approval for `guided-extraction-baseline` T042 follow-up.
+
+When a property has positive multi-value gold and extraction ends in a technical failure:
+
+1. End-to-end FN = number of valid gold values (`|gold|`). Example: gold `{TATAAT, TAAAAT}` + TIMEOUT → TP=0, FP=0, FN=2.
+2. That row is excluded from the conditioned scientific view (`n_targets = 0` for that property in the scientific slice).
+3. `technical_failures` (count/rate) stays **one** per failed property attempt, not one per gold value.
+4. A scientific abstention on the same gold still scores through `compare_sets` as MISS with `FN = |gold|`. It is not converted into a technical failure.
+
+Why: headline recall must not under-weight a pipeline failure relative to an abstention on the same multi-value target.
+
+Status: T031 amended. No root-contract edit.

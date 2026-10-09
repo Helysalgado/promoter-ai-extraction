@@ -47,13 +47,13 @@ _FORBIDDEN = (
 _SCIENTIFIC = {status.value for status in ScientificStatus}
 
 
-def _safe_input() -> SafeExtractionInput:
+def _safe_input(prop: Property = Property.TSS) -> SafeExtractionInput:
     return SafeExtractionInput(
         paper_id="PMC12345",
         promoter_name="lacZp1",
         promoter_id="ECK1200",
         paper_gene_synonym="lacZ",
-        property=Property.TSS,
+        property=prop,
         document_segments=(_SEG,),
     )
 
@@ -412,18 +412,42 @@ def test_reproducibility_metadata_excludes_secrets(monkeypatch: pytest.MonkeyPat
     outcome = backend.generate(_safe_input())
     assert isinstance(outcome, RawPropertyPayload)
     meta = backend.reproducibility_metadata()
-    assert meta["provider"] == "openai"
-    assert meta["model"] == MODEL_ID
-    assert meta["api"] == "responses"
-    assert "prompt_version" in meta
-    assert "schema_version" in meta
-    assert "generation" in meta
-    assert meta["generation"]["truncation"] == "disabled"
-    assert meta["model_snapshot"] == "gpt-6.1-sol-2026-09-29"
-    assert meta["document_hash"] is None
+    common = meta["common"]
+    assert common["provider"] == "openai"
+    assert common["model"] == MODEL_ID
+    assert common["api"] == "responses"
+    assert "prompt_version" in common
+    assert "schema_version" in common
+    assert common["generation"]["truncation"] == "disabled"
+    assert "document_hash" not in common
+    by_property = meta["by_property"]
+    assert by_property["TSS"]["model_snapshot"] == "gpt-6.1-sol-2026-09-29"
+    assert by_property["TSS"]["system_fingerprint"] == "fp_test"
     dumped = json.dumps(meta)
     assert _FAKE_KEY not in dumped
     assert "OPENAI_API_KEY" not in dumped
+
+
+def test_response_metadata_is_not_copied_across_properties(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    snapshots = iter(["snap-tss", "snap-caja10"])
+    fingerprints = iter(["fp-tss", "fp-caja10"])
+
+    def handler(kwargs: dict[str, object]) -> object:
+        return _completed_response(
+            model=next(snapshots),
+            system_fingerprint=next(fingerprints),
+        )
+
+    backend = _backend(handler, monkeypatch)
+    assert isinstance(backend.generate(_safe_input(Property.TSS)), RawPropertyPayload)
+    assert isinstance(backend.generate(_safe_input(Property.CAJA_10)), RawPropertyPayload)
+    by_property = backend.reproducibility_metadata()["by_property"]
+    assert by_property["TSS"]["model_snapshot"] == "snap-tss"
+    assert by_property["Caja -10"]["model_snapshot"] == "snap-caja10"
+    assert by_property["TSS"]["system_fingerprint"] != by_property["Caja -10"]["system_fingerprint"]
+    assert "Caja -35" not in by_property
 
 
 def test_no_fallback_model_in_request(monkeypatch: pytest.MonkeyPatch) -> None:
