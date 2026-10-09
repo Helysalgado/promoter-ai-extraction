@@ -455,3 +455,12 @@ slug: guided-extraction-baseline
 - blocker: live T042 still needs a human case list, cost cap, and credentials. Not run here.
 - note: six root contracts unchanged. Uncommitted. No T043.
 
+## T042 follow-up — 2026-10-09 (TSS typographic minus + numeric ID_paper)
+- status: complete for these two defects. Live T042 still not run. Not checkpointed.
+- red: `Ϫ12` and `−12` stayed unfolder; integer and integer-float `ID_paper` returned `CORRUPT_WORKBOOK`. ASCII `-12`, unsigned `12`, prose containing U+03EA, fractional ids, and boolean ids already behaved as required.
+- green: `uv run pytest tests/unit/test_normalization.py tests/unit/evaluation/test_gold_loader.py tests/unit/evaluation/test_gold_parser.py` — 95 passed.
+- files: `src/promoter_ai_extraction/normalization.py`, `src/promoter_ai_extraction/evaluation/gold_loader.py`, `tests/unit/test_normalization.py`, `tests/unit/evaluation/test_gold_loader.py`, `02-DOCS/wiki/sdd/decisions.md`
+- decision: fold U+03EA and U+2212 only on a whole integer token. Convert unambiguous numeric `ID_paper` to text. Do not touch curator target cells or source documents.
+- blocker: none for this increment. Live OpenAI case still unauthorized.
+- note: no prompt change, no T043, no commit.
+

@@ -72,8 +72,11 @@ class NormalizationResult:
 # ─── TSS normalizer ───────────────────────────────────────────────────────────
 
 # Matches a complete signed-integer string (including bare unsigned ints and
-# conventional TSS designations such as +1).
+# conventional TSS designations such as +1). Sign characters are ASCII only.
 _SIGNED_INTEGER_RE = re.compile(r"^[+-]?\d+$")
+# Leading glyphs that GROBID and typography use as a minus, never as a digit.
+# U+03EA (Coptic gangia / GROBID minus) and U+2212 (MINUS SIGN).
+_TYPOGRAPHIC_MINUS = frozenset({"\u03ea", "\u2212"})
 _TSS_DISTANCE_RE = re.compile(
     r"^(?P<distance>\d+)\s*(?:bp|nt|nucleotides?)?\s+"
     r"(?P<direction>upstream|downstream)(?P<context>.*)$",
@@ -94,6 +97,9 @@ def normalize_tss(raw: str, *, anchor_context: str | None = None) -> Normalizati
     - Strip leading/trailing whitespace.
     - A signed (or unsigned) integer string is returned as-is (covers
       ``-42``, ``+42``, ``0``, ``+1``, genomic coordinates).
+    - A whole token whose only sign is U+03EA or U+2212 followed by digits
+      folds that sign to ASCII ``-``. Prose that merely contains the glyph
+      is left unchanged. An unsigned digit string never gains a sign.
     - A documentary upstream/downstream distance is signed only when the raw
       form or the explicitly supplied context names an approved
       translation-start anchor.
@@ -116,9 +122,15 @@ def normalize_tss(raw: str, *, anchor_context: str | None = None) -> Normalizati
         translation-start anchor.
     """
     stripped = raw.strip()
+    folded, folded_sign = _fold_typographic_integer_sign(stripped)
     # Plain or signed integers (covers -42, +42, 0, +1, and genomic coords).
-    if _SIGNED_INTEGER_RE.match(stripped):
-        return NormalizationResult(value_normalized=stripped, derivation_note=None)
+    if _SIGNED_INTEGER_RE.match(folded):
+        note = (
+            "typographic minus folded to ASCII hyphen-minus"
+            if folded_sign
+            else None
+        )
+        return NormalizationResult(value_normalized=folded, derivation_note=note)
 
     distance_match = _TSS_DISTANCE_RE.match(stripped)
     if distance_match:
@@ -143,6 +155,16 @@ def normalize_tss(raw: str, *, anchor_context: str | None = None) -> Normalizati
 
     # All other forms: preserve the stripped raw form unchanged (TSS-04).
     return NormalizationResult(value_normalized=stripped, derivation_note=None)
+
+
+def _fold_typographic_integer_sign(stripped: str) -> tuple[str, bool]:
+    """Fold a leading typographic minus only on a complete integer token."""
+    if len(stripped) < 2 or stripped[0] not in _TYPOGRAPHIC_MINUS:
+        return stripped, False
+    digits = stripped[1:]
+    if not digits.isdigit():
+        return stripped, False
+    return f"-{digits}", True
 
 
 # ─── Box sequence normalizer ──────────────────────────────────────────────────

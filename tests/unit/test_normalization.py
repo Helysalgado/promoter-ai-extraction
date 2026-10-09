@@ -125,6 +125,38 @@ class TestTssNormalization:
         result = normalize_tss("  -42  ")
         assert result.value_normalized == "-42"
 
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "\u03ea12",  # U+03EA, GROBID minus glyph
+            "\u221212",  # U+2212 MINUS SIGN
+            "-12",
+        ],
+    )
+    def test_typographic_minus_on_integer_becomes_ascii(self, raw: str) -> None:
+        """A leading typographic minus on a whole integer folds to ASCII '-'."""
+        original = raw
+        result = normalize_tss(raw)
+        assert result.value_normalized == "-12"
+        assert original == raw
+        if raw == "-12":
+            assert result.derivation_note is None
+        else:
+            assert result.derivation_note is not None
+
+    def test_unsigned_integer_does_not_gain_a_minus(self) -> None:
+        """A digit string with no minus stays unsigned."""
+        result = normalize_tss("12")
+        assert result.value_normalized == "12"
+        assert result.derivation_note is None
+
+    def test_typographic_minus_inside_prose_is_not_rewritten(self) -> None:
+        """Folding applies only to a whole signed-integer token, not a sentence."""
+        raw = "initiation site \u03ea12 bp from the proposed start codon"
+        result = normalize_tss(raw)
+        assert result.value_normalized == raw
+        assert "\u03ea" in result.value_normalized
+
 
 # ─── Box sequence normalization ───────────────────────────────────────────────
 

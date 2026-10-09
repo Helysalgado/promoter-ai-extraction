@@ -28,6 +28,8 @@ _HEADER_ROW = 4
 _SHEET_NAME = "Hoja1"
 _PROPERTY_BY_LABEL = {member.value: member for member in Property}
 _SCIENTIFIC_CODES = frozenset(status.value for status in ScientificStatus)
+# Floats beyond this magnitude are not exact integers (IEEE-754).
+_MAX_EXACT_FLOAT_INT = 2**53
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +70,30 @@ def _fail(code: str, message: str, cause: str) -> GoldLoadError:
         message=message,
         cause=cause,
     )
+
+
+def _paper_id_text(value: object) -> str | None:
+    """Return an unambiguous paper-id string, or None when conversion is unsafe.
+
+    Excel numeric cells arrive as ``int`` or as an integer-valued ``float``.
+    ``bool`` is rejected because it is an ``int`` subclass. Fractional floats
+    and floats outside the exact integer range are rejected. Curator target
+    cells are not passed through this function.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        if not value.is_integer():
+            return None
+        if abs(value) > _MAX_EXACT_FLOAT_INT:
+            return None
+        return str(int(value))
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped or None
+    return None
 
 
 def _storage_type(value: object) -> str:
@@ -169,8 +195,13 @@ class GoldLoader:
         gold_value = cell("GT_para_referencia")
         if paper_id is None and promoter_name is None and property_label is None:
             return None
-        if not isinstance(paper_id, str) or not paper_id.strip():
-            return _fail("CORRUPT_WORKBOOK", "A gold row is missing ID_paper.", "ValueError")
+        paper_id_text = _paper_id_text(paper_id)
+        if paper_id_text is None:
+            return _fail(
+                "CORRUPT_WORKBOOK",
+                "A gold row has a missing or ambiguous ID_paper.",
+                "ValueError",
+            )
         if not isinstance(promoter_name, str) or not promoter_name.strip():
             return _fail(
                 "CORRUPT_WORKBOOK",
@@ -193,7 +224,7 @@ class GoldLoader:
             else None
         )
         return GoldRecord(
-            paper_id=paper_id.strip(),
+            paper_id=paper_id_text,
             promoter_name=promoter_name.strip(),
             property=prop,
             gold_value_raw=gold_value,

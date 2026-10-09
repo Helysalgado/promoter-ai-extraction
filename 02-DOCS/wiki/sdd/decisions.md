@@ -255,3 +255,15 @@ When a property has positive multi-value gold and extraction ends in a technical
 Why: headline recall must not under-weight a pipeline failure relative to an abstention on the same multi-value target.
 
 Status: T031 amended. No root-contract edit.
+
+## 2026-10-09 — TSS typographic minus and numeric gold paper id
+
+Context: a GROBID TXT can encode a TSS minus as U+03EA (`Ϫ12`). Excel can deliver `ID_paper` as an integer. Neither path may invent a sign, rewrite source documents, or alter curator target cells.
+
+Options: rewrite corpus files; fold every U+03EA in document text before the model; fold only a complete integer token in the TSS normalizer. For paper ids: reject all non-strings; stringify every number including fractions; stringify only unambiguous integers.
+
+Decision: TSS normalizer folds a leading U+03EA or U+2212 to ASCII `-` only when the rest of the stripped token is digits. `value_raw` stays the backend string. Unsigned digits stay unsigned. `GoldLoader` converts `int` and integer-valued floats inside the exact float range to text. It rejects `bool`, fractional floats, and floats beyond `2**53`. `GT_para_referencia` is unchanged.
+
+Why: the comparison key is ASCII `value_normalized`, and the evaluation join key is a string `paper_id`. Both fixes stay on their existing side of the extractor/evaluator boundary.
+
+Status: local T042 follow-up. No root-contract edit. Not checkpointed.

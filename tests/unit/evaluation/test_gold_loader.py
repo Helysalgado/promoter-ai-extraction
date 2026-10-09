@@ -176,6 +176,58 @@ def test_fixture_path_is_tmp_and_not_real_gold(tmp_path: Path) -> None:
     assert "SUBSET_GOLD.xlsx" not in resolved
 
 
+def test_integer_paper_id_becomes_text_and_gold_value_stays_numeric(
+    tmp_path: Path,
+) -> None:
+    """Excel may deliver ID_paper as an int. Curator values stay untouched."""
+    verified = persist_verified(tmp_path)
+    gold_path = write_synthetic_gold(
+        tmp_path / "gold.xlsx",
+        [_row(paper_id=10400579, gt=-12)],  # type: ignore[arg-type]
+    )
+    dataset = GoldLoader().load(verified, gold_path)
+    assert not isinstance(dataset, GoldLoadError)
+    record = dataset.records[0]
+    assert record.paper_id == "10400579"
+    assert isinstance(record.paper_id, str)
+    assert record.gold_value_raw == -12
+    assert record.storage_type == "numeric"
+
+
+def test_integer_valued_float_paper_id_becomes_text(tmp_path: Path) -> None:
+    verified = persist_verified(tmp_path)
+    gold_path = write_synthetic_gold(
+        tmp_path / "gold.xlsx",
+        [_row(paper_id=10400579.0)],  # type: ignore[arg-type]
+    )
+    dataset = GoldLoader().load(verified, gold_path)
+    assert not isinstance(dataset, GoldLoadError)
+    assert dataset.records[0].paper_id == "10400579"
+
+
+def test_fractional_paper_id_is_rejected(tmp_path: Path) -> None:
+    verified = persist_verified(tmp_path)
+    gold_path = write_synthetic_gold(
+        tmp_path / "gold.xlsx",
+        [_row(paper_id=10400579.5)],  # type: ignore[arg-type]
+    )
+    outcome = GoldLoader().load(verified, gold_path)
+    assert isinstance(outcome, GoldLoadError)
+    assert outcome.code == "CORRUPT_WORKBOOK"
+    assert outcome.code not in {status.value for status in ScientificStatus}
+
+
+def test_boolean_paper_id_is_rejected(tmp_path: Path) -> None:
+    verified = persist_verified(tmp_path)
+    gold_path = write_synthetic_gold(
+        tmp_path / "gold.xlsx",
+        [_row(paper_id=True)],  # type: ignore[arg-type]
+    )
+    outcome = GoldLoader().load(verified, gold_path)
+    assert isinstance(outcome, GoldLoadError)
+    assert outcome.code == "CORRUPT_WORKBOOK"
+
+
 def test_gold_load_error_code_is_not_scientific() -> None:
     scientific = {status.value for status in ScientificStatus}
     for code in (
