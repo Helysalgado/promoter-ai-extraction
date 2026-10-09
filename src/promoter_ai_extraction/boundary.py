@@ -564,3 +564,121 @@ class CaseManifestFactory:
             paper_gene_synonym=paper_gene_synonym,
             property=prop,
         )
+
+
+# ---------------------------------------------------------------------------
+# DevelopmentCase — paper × promoter file row (T039; no property, no gold)
+# ---------------------------------------------------------------------------
+
+#: Exact set of keys accepted by a development-case row. The runner requests
+#: the fixed four-property set (spec §Inputs); property is not a file column.
+DEVELOPMENT_CASE_ALLOWLIST: frozenset[str] = frozenset(
+    {
+        "document_path",
+        "document_format",
+        "paper_id",
+        "promoter_id",
+        "promoter_name",
+        "paper_gene_synonym",
+    }
+)
+
+
+@dataclass(frozen=True, slots=True)
+class DevelopmentCase:
+    """One leakage-safe development case: paper × promoter + document reference."""
+
+    document_path: Path
+    document_format: Literal["TXT", "TEI/XML"]
+    paper_id: str
+    promoter_id: str | None
+    promoter_name: str
+    paper_gene_synonym: str | None
+
+
+class DevelopmentCaseFactory:
+    """Validates one development-manifest row (identities and document reference)."""
+
+    def from_mapping(self, mapping: Mapping[str, Any]) -> DevelopmentCase:
+        _check_forbidden_keys(mapping)
+        _check_allowlist(mapping, DEVELOPMENT_CASE_ALLOWLIST, context="manifest")
+
+        raw_path = mapping.get("document_path")
+        if raw_path is None:
+            raise BoundaryViolation(
+                code="INVALID_FIELD_VALUE",
+                message="'document_path' is required and must be a non-empty string or Path.",
+            )
+        if isinstance(raw_path, str) and not raw_path.strip():
+            raise BoundaryViolation(
+                code="INVALID_FIELD_VALUE",
+                message="'document_path' must be a non-empty, non-whitespace path.",
+            )
+        try:
+            doc_path = Path(raw_path)  # type: ignore[arg-type]
+        except TypeError:
+            raise BoundaryViolation(
+                code="INVALID_FIELD_TYPE",
+                message="'document_path' must be a string or Path-like object.",
+            )
+
+        doc_format = mapping.get("document_format")
+        if not isinstance(doc_format, str):
+            raise BoundaryViolation(
+                code="INVALID_FIELD_TYPE",
+                message="'document_format' must be a string.",
+            )
+        if doc_format not in _VALID_FORMATS:
+            raise BoundaryViolation(
+                code="INVALID_FIELD_VALUE",
+                message=f"'document_format' must be one of {sorted(_VALID_FORMATS)}.",
+            )
+
+        paper_id = mapping.get("paper_id")
+        if not isinstance(paper_id, str) or not paper_id.strip():
+            raise BoundaryViolation(
+                code="INVALID_FIELD_VALUE",
+                message="'paper_id' must be a non-empty string.",
+            )
+
+        promoter_name = mapping.get("promoter_name")
+        if not isinstance(promoter_name, str) or not promoter_name.strip():
+            raise BoundaryViolation(
+                code="INVALID_FIELD_VALUE",
+                message="'promoter_name' must be a non-empty string.",
+            )
+
+        promoter_id = mapping.get("promoter_id")
+        if promoter_id is not None:
+            if not isinstance(promoter_id, str):
+                raise BoundaryViolation(
+                    code="INVALID_FIELD_TYPE",
+                    message="'promoter_id' must be a string or None.",
+                )
+            if not promoter_id.strip():
+                raise BoundaryViolation(
+                    code="INVALID_FIELD_VALUE",
+                    message="'promoter_id', when supplied, must be a non-empty string.",
+                )
+
+        paper_gene_synonym = mapping.get("paper_gene_synonym")
+        if paper_gene_synonym is not None:
+            if not isinstance(paper_gene_synonym, str):
+                raise BoundaryViolation(
+                    code="INVALID_FIELD_TYPE",
+                    message="'paper_gene_synonym' must be a string or None.",
+                )
+            if not paper_gene_synonym.strip():
+                raise BoundaryViolation(
+                    code="INVALID_FIELD_VALUE",
+                    message="'paper_gene_synonym', when supplied, must be a non-empty string.",
+                )
+
+        return DevelopmentCase(
+            document_path=doc_path,
+            document_format=cast(Literal["TXT", "TEI/XML"], doc_format),
+            paper_id=paper_id,
+            promoter_id=promoter_id,
+            promoter_name=promoter_name,
+            paper_gene_synonym=paper_gene_synonym,
+        )

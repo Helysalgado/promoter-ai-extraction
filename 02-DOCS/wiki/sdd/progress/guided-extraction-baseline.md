@@ -400,3 +400,40 @@ slug: guided-extraction-baseline
 - blocker: none
 - note: `document_hash` remains None in adapter metadata for later persist wiring; no live API call; uncommitted
 
+## T039 — 2026-10-08
+- status: complete
+- red: `tests/unit/test_development_manifest.py` failed at collection — `promoter_ai_extraction.manifest` missing
+- green: T039 tests + `test_boundary` + gold isolation 127 passed; `./scripts/verify.sh` — 481 passed
+- files: `src/promoter_ai_extraction/manifest.py`, `src/promoter_ai_extraction/boundary.py`, `tests/unit/test_development_manifest.py`, `tests/fixtures/synthetic_safe_manifest.json`, `tests/contract/test_gold_boundary.py`, `scripts/verify.sh`
+- decision: development-manifest rows are paper × promoter (document reference + identities). No `property` column — the runner applies the fixed four-property set (spec §Inputs). No gold/evaluator columns. Real file path `02-DOCS/data/safe-development-manifest.json` stays git-ignored; tests use a synthetic fixture. Case selection for the real local run is deferred to T042 (human-authored untracked file).
+- blocker: none
+- note: T039 does not copy or derive cases from SUBSET_GOLD.xlsx. Uncommitted.
+
+## T040 — 2026-10-08
+- status: complete (RED; GREEN is T041)
+- red: `uv run pytest tests/integration/test_baseline_runner.py` — collection `ModuleNotFoundError: No module named 'promoter_ai_extraction.baseline'`
+- green: deferred to T041 (`src/promoter_ai_extraction/baseline.py`)
+- triangulation: persist-before-gold via `GoldLoader.load` monkeypatch; leaky GT column rejected without gold; TIMEOUT vs `INSUFFICIENT_EVIDENCE`; `predictions/` git-ignore; no-overwrite second run; extractor never sees gold/evaluator fields
+- files: `tests/integration/test_baseline_runner.py`
+- decision: none. Runner API follows T041 Interfaces (`BaselineRunner.run(manifest, documents, gold, predictions, report)`). Stable `run_id` per paper × promoter is implied by the no-overwrite assertion; not a new scientific contract.
+- blocker: none
+- note: synthetic papers/gold/manifest only under `tmp_path`. No `SUBSET_GOLD.xlsx`, no real documents, no live OpenAI. `./scripts/verify.sh` exits 2 until T041. T039 remains uncommitted. T041 not started.
+
+## T041 — 2026-10-08
+- status: complete
+- red: T040 collection failed for missing `promoter_ai_extraction.baseline`
+- green: `uv run pytest tests/integration/test_baseline_runner.py -vv` — 7 passed (assertions executed, not import-only); `./scripts/verify.sh` — 488 passed
+- files: `src/promoter_ai_extraction/baseline.py`
+- decision: none. `BaselineRunner` reuses `DevelopmentManifestLoader` and `GuidedBaselineApplication`. Stable `run_id` is `{paper_id}__{promoter_name}` so `PredictionStore` no-overwrite holds. Report JSON writes counts + `limitation_note` after a successful evaluate. CLI `python -m` remains T042.
+- blocker: none
+- note: no contract edits; no live OpenAI; no real papers or `SUBSET_GOLD.xlsx`. T039–T041 remain uncommitted. T042 not started.
+
+## T039–T041 review follow-up — 2026-10-08
+- status: complete
+- red: duplicate paper × promoter loaded; absolute/`../`/symlink-escape paths reached extraction
+- green: `uv run pytest tests/unit/test_development_manifest.py tests/integration/test_baseline_runner.py tests/contract/test_gold_boundary.py` — 30 passed; `./scripts/verify.sh` — 495 passed
+- files: `src/promoter_ai_extraction/manifest.py`, `src/promoter_ai_extraction/baseline.py`, `tests/unit/test_development_manifest.py`, `tests/integration/test_baseline_runner.py`
+- decision: identity for duplicates is exact `(paper_id, promoter_name)`. Path confinement uses `Path.resolve()` (follows symlinks) and `is_relative_to`; absolute paths and escapes return `TechnicalFailure(code="PATH_OUTSIDE_ROOT")` before `DocumentSource` is opened. Not an OS sandbox.
+- blocker: none
+- note: uncommitted. T042 not started.
+

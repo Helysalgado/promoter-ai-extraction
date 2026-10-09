@@ -22,13 +22,21 @@ fi
 # Integrity: synthetic fixtures must remain versionable.
 # If the .gitignore has been broadened (e.g. to *.xlsx) it would accidentally
 # exclude synthetic test fixtures — detect and fail fast.
-if git check-ignore -q "tests/fixtures/synthetic_gold.xlsx" 2>/dev/null; then
-    echo "[FAIL] tests/fixtures/synthetic_gold.xlsx is git-ignored."
+if git check-ignore -q "tests/fixtures/synthetic_gold.xlsx" 2>/dev/null \
+    || git check-ignore -q "tests/fixtures/synthetic_safe_manifest.json" 2>/dev/null; then
+    echo "[FAIL] a synthetic fixture under tests/fixtures/ is git-ignored."
     echo "       Synthetic fixtures must be versionable. Do not broaden .gitignore"
-    echo "       to match all XLSX/XML/TXT files. Check .gitignore (T001)."
+    echo "       to match all XLSX/XML/TXT/JSON files. Check .gitignore (T001/T039)."
     exit 1
 else
-    echo "[ok] Synthetic fixture path is versionable (not git-ignored)."
+    echo "[ok] Synthetic fixture paths are versionable (not git-ignored)."
+fi
+
+if git check-ignore -q "02-DOCS/data/safe-development-manifest.json" 2>/dev/null; then
+    echo "[ok] Real development manifest path is git-ignored."
+else
+    echo "[FAIL] 02-DOCS/data/safe-development-manifest.json is not git-ignored."
+    exit 1
 fi
 
 echo ""

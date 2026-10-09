@@ -27,6 +27,7 @@ _EXTRACTION_MODULES = (
     "persistence.py",
     "backends/__init__.py",
     "backends/openai_backend.py",
+    "manifest.py",
 )
 
 
