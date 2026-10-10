@@ -340,6 +340,81 @@ def test_module_help_exits_zero() -> None:
     assert "--gold" in completed.stdout
     assert "--predictions" in completed.stdout
     assert "--report" in completed.stdout
+    assert "--max-output-tokens" in completed.stdout
+
+
+def test_cli_forwards_output_cap_to_backend(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: dict[str, object] = {}
+
+    class _CaptureBackend:
+        def __init__(self, **kwargs: object) -> None:
+            seen.update(kwargs)
+
+        def generate(self, safe_input: SafeExtractionInput) -> BackendFailure:
+            return BackendFailure(code="STOPPED", message="cost-control test")
+
+        def reproducibility_metadata(self) -> dict[str, object]:
+            return {"common": {}, "by_property": {}}
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-not-a-real-key-do-not-leak")
+    monkeypatch.setattr(
+        "promoter_ai_extraction.baseline.OpenAIModelBackend",
+        _CaptureBackend,
+    )
+    manifest, documents, gold, predictions, report = _write_layout(tmp_path)
+    code = main(
+        [
+            "--manifest",
+            str(manifest),
+            "--documents",
+            str(documents),
+            "--gold",
+            str(gold),
+            "--predictions",
+            str(predictions),
+            "--report",
+            str(report),
+            "--max-output-tokens",
+            "4096",
+        ]
+    )
+    assert seen["max_output_tokens"] == 4096
+    assert code in (0, 1)
+
+
+def test_cli_rejects_non_positive_output_cap(tmp_path: Path) -> None:
+    manifest, documents, gold, predictions, report = _write_layout(tmp_path)
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "promoter_ai_extraction.baseline",
+            "--manifest",
+            str(manifest),
+            "--documents",
+            str(documents),
+            "--gold",
+            str(gold),
+            "--predictions",
+            str(predictions),
+            "--report",
+            str(report),
+            "--max-output-tokens",
+            "0",
+        ],
+        cwd=_REPO,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode != 0
+    assert "positive integer" in completed.stderr
+    assert "unrecognized arguments" not in completed.stderr
+    assert not report.is_file()
+    assert "sk-" not in completed.stdout
+    assert "sk-" not in completed.stderr
 
 
 def test_module_missing_args_exits_nonzero() -> None:

@@ -267,3 +267,17 @@ Decision: TSS normalizer folds a leading U+03EA or U+2212 to ASCII `-` only when
 Why: the comparison key is ASCII `value_normalized`, and the evaluation join key is a string `paper_id`. Both fixes stay on their existing side of the extractor/evaluator boundary.
 
 Status: local T042 follow-up. No root-contract edit. Not checkpointed.
+
+## 2026-10-09 — Configurable output cap and no SDK retries
+
+Context: the first real T042 call must stay within USD $2. `max_output_tokens` was fixed at 128000, and `OpenAI()` inherited the SDK default of two retries.
+
+Options: change the published default to 4096; add a CLI override and keep 128000 as the default; rely only on an organization spend limit.
+
+Decision: `OpenAIModelBackend(max_output_tokens=)` accepts a positive integer and defaults to 128000. The CLI flag is `--max-output-tokens`. The first planned run will pass 4096. The live client is constructed with `max_retries=0`. The application has no other retry loop. The effective cap and `max_retries` are stored in reproducibility `generation` metadata. The character budget stays tied to the published 128000 reserve, so a lower cap does not widen the input budget.
+
+The real file `02-DOCS/data/safe-development-manifest.json` lives only in the main checkout. It is untracked and unstaged. It must stay out of Git. This change does not add an ignore rule, so synthetic fixtures under `tests/fixtures/` stay versionable. The main checkout is behind `8a8b4f9`, which is why that working tree does not yet apply `/02-DOCS/data/`.
+
+Why: the default benchmark path stays unchanged, and the controlled run can cap output and retries without a second code path.
+
+Status: local. Not checkpointed. No live OpenAI call.

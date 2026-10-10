@@ -38,6 +38,8 @@ SCHEMA_VERSION = "raw-property-payload-v1"
 # https://developers.openai.com/api/docs/models/gpt-6.1-sol
 CONTEXT_WINDOW_TOKENS = 1_050_000
 MAX_OUTPUT_TOKENS = 128_000
+# The installed SDK retries by default. This adapter does not.
+SDK_MAX_RETRIES = 0
 
 _STATUS_VALUES = [status.value for status in ScientificStatus]
 _SCIENTIFIC = frozenset(_STATUS_VALUES)
@@ -152,9 +154,11 @@ class OpenAIModelBackend:
         *,
         client: _ResponsesClient | None = None,
         environ: Mapping[str, str] | None = None,
+        max_output_tokens: int = MAX_OUTPUT_TOKENS,
     ) -> None:
         self._client = client
         self._environ = environ if environ is not None else os.environ
+        self._max_output_tokens = _require_positive_int(max_output_tokens)
         self._common: dict[str, Any] | None = None
         self._by_property: dict[str, dict[str, Any]] = {}
 
@@ -180,7 +184,7 @@ class OpenAIModelBackend:
                 "the document was not truncated.",
             )
 
-        request = _build_request(prompt)
+        request = _build_request(prompt, self._max_output_tokens)
         self._record_fingerprint(
             safe_input.property.value,
             request,
@@ -237,10 +241,17 @@ class OpenAIModelBackend:
         self._by_property[property_label] = recorded["by_property"]
 
 
+def _require_positive_int(value: int) -> int:
+    """Accept only a positive integer. ``bool`` is rejected as an ``int`` subclass."""
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError("max_output_tokens must be a positive integer.")
+    return value
+
+
 def _live_client(secret: str) -> Any:
     from openai import OpenAI
 
-    return OpenAI(api_key=secret)
+    return OpenAI(api_key=secret, max_retries=SDK_MAX_RETRIES)
 
 
 def _build_prompt(safe_input: SafeExtractionInput) -> str:
@@ -263,13 +274,13 @@ def _build_prompt(safe_input: SafeExtractionInput) -> str:
     return "\n".join(lines)
 
 
-def _build_request(prompt: str) -> dict[str, Any]:
+def _build_request(prompt: str, max_output_tokens: int = MAX_OUTPUT_TOKENS) -> dict[str, Any]:
     return {
         "model": MODEL_ID,
         "input": prompt,
         "store": False,
         "truncation": "disabled",
-        "max_output_tokens": MAX_OUTPUT_TOKENS,
+        "max_output_tokens": max_output_tokens,
         "text": {
             "format": {
                 "type": "json_schema",
@@ -297,6 +308,7 @@ def _fingerprint(
             "schema_version": SCHEMA_VERSION,
             "generation": {
                 "max_output_tokens": request["max_output_tokens"],
+                "max_retries": SDK_MAX_RETRIES,
                 "text_format": fmt["type"],
                 "strict": fmt["strict"],
                 "store": request["store"],

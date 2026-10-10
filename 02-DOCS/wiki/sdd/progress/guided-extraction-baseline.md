@@ -464,3 +464,12 @@ slug: guided-extraction-baseline
 - blocker: none for this increment. Live OpenAI case still unauthorized.
 - note: no prompt change, no T043, no commit.
 
+## T042 cost control — 2026-10-09
+- status: complete for the cap and retry switch. Live call still not run. Not checkpointed.
+- red: constructor rejected `max_output_tokens`; metadata had no `max_retries`; CLI help lacked `--max-output-tokens`; `--max-output-tokens 4096` was an unrecognized argument.
+- green: adapter, CLI, and reproducibility tests after the implementation. `./scripts/verify.sh` recorded in the session report.
+- files: `src/promoter_ai_extraction/backends/openai_backend.py`, `src/promoter_ai_extraction/baseline.py`, `tests/contract/test_real_backend_adapter.py`, `tests/integration/test_baseline_cli.py`, `02-DOCS/wiki/sdd/decisions.md`
+- decision: default output cap stays 128000. CLI can set a positive integer. Live client uses `max_retries=0`. No new gitignore rule. The real manifest stays untracked.
+- blocker: the live run is still not authorized.
+- note: no OpenAI call, no gold edit, no commit.
+

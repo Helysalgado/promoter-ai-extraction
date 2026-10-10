@@ -455,3 +455,47 @@ def test_no_fallback_model_in_request(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", _FAKE_KEY)
     OpenAIModelBackend(client=fake).generate(_safe_input())
     assert fake.calls[0]["model"] == "gpt-6.1-sol"
+
+
+def test_default_output_cap_stays_published_maximum(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeResponsesClient(lambda kwargs: _completed_response())
+    monkeypatch.setenv("OPENAI_API_KEY", _FAKE_KEY)
+    backend = OpenAIModelBackend(client=fake)
+    assert isinstance(backend.generate(_safe_input()), RawPropertyPayload)
+    assert len(fake.calls) == 1
+    assert fake.calls[0]["max_output_tokens"] == MAX_OUTPUT_TOKENS
+    generation = backend.reproducibility_metadata()["common"]["generation"]
+    assert generation["max_output_tokens"] == MAX_OUTPUT_TOKENS
+    assert generation["max_retries"] == 0
+
+
+def test_configured_output_cap_is_sent_and_recorded(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeResponsesClient(lambda kwargs: _completed_response())
+    monkeypatch.setenv("OPENAI_API_KEY", _FAKE_KEY)
+    backend = OpenAIModelBackend(client=fake, max_output_tokens=4096)
+    assert isinstance(backend.generate(_safe_input()), RawPropertyPayload)
+    assert fake.calls[0]["max_output_tokens"] == 4096
+    generation = backend.reproducibility_metadata()["common"]["generation"]
+    assert generation["max_output_tokens"] == 4096
+    assert generation["max_retries"] == 0
+
+
+@pytest.mark.parametrize("invalid", [0, -1, True])
+def test_output_cap_rejects_non_positive_integers(invalid: object) -> None:
+    with pytest.raises(ValueError):
+        OpenAIModelBackend(max_output_tokens=invalid)  # type: ignore[arg-type]
+
+
+def test_live_client_sets_max_retries_to_zero(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _CapturingClient:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr("openai.OpenAI", _CapturingClient)
+    from promoter_ai_extraction.backends.openai_backend import _live_client
+
+    _live_client(_FAKE_KEY)
+    assert captured["max_retries"] == 0
+    assert _FAKE_KEY not in json.dumps({key: value for key, value in captured.items() if key != "api_key"})

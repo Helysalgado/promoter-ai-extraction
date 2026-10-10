@@ -15,6 +15,7 @@ from pathlib import Path
 from promoter_ai_extraction import __version__
 from promoter_ai_extraction.application import GuidedBaselineApplication
 from promoter_ai_extraction.backends import OpenAIModelBackend
+from promoter_ai_extraction.backends.openai_backend import MAX_OUTPUT_TOKENS
 from promoter_ai_extraction.boundary import BoundaryViolation, DevelopmentCase
 from promoter_ai_extraction.documents import DocumentSource
 from promoter_ai_extraction.evaluation.gold_parser import PARSER_VERSION
@@ -114,6 +115,15 @@ def main(
     parser.add_argument("--gold", type=Path, required=True)
     parser.add_argument("--predictions", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument(
+        "--max-output-tokens",
+        type=_positive_output_tokens,
+        default=MAX_OUTPUT_TOKENS,
+        help=(
+            "Positive output-token cap for each property call. "
+            f"Default: {MAX_OUTPUT_TOKENS}."
+        ),
+    )
     args = parser.parse_args(argv)
 
     if backend is None:
@@ -121,7 +131,9 @@ def main(
         if not secret:
             print("MISSING_CREDENTIAL: OPENAI_API_KEY is not set.", file=sys.stderr)
             return 1
-        active: ModelBackend = OpenAIModelBackend()
+        active: ModelBackend = OpenAIModelBackend(
+            max_output_tokens=args.max_output_tokens
+        )
     else:
         active = backend
     try:
@@ -139,6 +151,20 @@ def main(
         return 0
     print(_failure_message(outcome), file=sys.stderr)
     return 1
+
+
+def _positive_output_tokens(raw: str) -> int:
+    """Argparse type: a positive decimal integer, with no sign and no fraction."""
+    if not raw.isdecimal():
+        raise argparse.ArgumentTypeError(
+            "max-output-tokens must be a positive integer."
+        )
+    value = int(raw)
+    if value < 1:
+        raise argparse.ArgumentTypeError(
+            "max-output-tokens must be a positive integer."
+        )
+    return value
 
 
 def _path_outside_root() -> TechnicalFailure:
