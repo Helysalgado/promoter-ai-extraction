@@ -1,9 +1,9 @@
 ---
 type: guide
 title: LIDR demo preparation
-description: Checklist to record the final demo from the completed synthetic run, without a new provider call.
+description: Checklist to record the demo by reloading the saved synthetic prediction, without a new provider call.
 tags: [lidr, demo, ui]
-timestamp: 2026-10-10T07:40:00-06:00
+timestamp: 2026-10-10T08:00:00-06:00
 topic: lidr
 slug: lidr-demo-prep
 status: draft
@@ -15,25 +15,14 @@ Guion: `02-DOCS/process/2026-10-10-lidr-demo-script.md`.
 
 No pulses «Extraer propiedades». No exportes `ANTHROPIC_API_KEY` ni `OPENAI_API_KEY`. No abras gold, artículos reales ni `.env`.
 
-## Antes de grabar
+La vista principal es la consulta en la página. Las capturas de `Documents/LIDR/promoter-ai-extraction/demo-evidence/` son evidencia secundaria y no se agregan a Git.
 
-- Cierra la pestaña de `.env`.
-- Las cinco capturas ya tienen respaldo local, fuera del repositorio y fuera de Git: `Documents/LIDR/promoter-ai-extraction/demo-evidence/`. Los originales siguen en `/tmp/ui-live-01/shots/`. No las agregues a Git.
-- Comprueba que siguen estos archivos:
-  - `/tmp/ui-live-01/narnZp9.txt` (590 bytes)
-  - `/tmp/ui-live-01/shots/01-form-before.png`
-  - `/tmp/ui-live-01/shots/02-processing.png`
-  - `/tmp/ui-live-01/shots/03-cards.png`
-  - `/tmp/ui-live-01/shots/04-detail.png`
-  - `/tmp/ui-live-01/shots/05-trace.png`
-  - `runs/ui-live-01/SYNTH-UI-LIVE-01__narnZp9.json`
-- Ten a mano un grabador de pantalla y una ventana del navegador. El zoom del navegador debe dejar las cuatro tarjetas en una fila.
-
-## Arranque, sin proveedor
+## Arranque, sin credenciales
 
 Desde `.worktrees/lidr-application`:
 
 ```bash
+unset ANTHROPIC_API_KEY OPENAI_API_KEY
 export PREDICTION_DIR="$PWD/runs/ui-live-01"
 uv run uvicorn promoter_ai_extraction.api:app --host 127.0.0.1 --port 8765
 ```
@@ -46,26 +35,31 @@ curl -sS http://127.0.0.1:8765/health
 
 La respuesta esperada es `{"status":"ok","software_version":"0.1.0"}`.
 
-Abre `http://127.0.0.1:8765/`. Selecciona el TXT sintético y completa `SYNTH-UI-LIVE-01`, `narnZp9` y `narnase`. Marca «Agente» y la confirmación. Detente ahí.
+Abre `http://127.0.0.1:8765/`. No cargues un archivo. Escribe `SYNTH-UI-LIVE-01` y `narnZp9`. Pulsa «Consultar resultado guardado».
 
-`PREDICTION_DIR` apunta al directorio de la corrida ya guardada. Un clic accidental con esa identidad recibe 409 antes del proveedor y no pinta las tarjetas. Las tarjetas de la demostración son las capturas.
+## Comprobación antes de grabar
 
-## Qué mostrar de los resultados
+- Servidor: `GET /health` responde 200 y el proceso no tiene `ANTHROPIC_API_KEY` ni `OPENAI_API_KEY`.
+- Navegador: una ventana en `http://127.0.0.1:8765/`, con zoom suficiente para las cuatro tarjetas. La pestaña de `.env` está cerrada.
+- Formulario: PMID/ID `SYNTH-UI-LIVE-01`, promotor `narnZp9`, sin archivo y sin confirmación. «Consultar resultado guardado» está habilitado. «Extraer propiedades» está deshabilitado.
+- Consulta: el estado dice «Resultado previamente guardado».
+- Evidencias: la tarjeta de caja −10 muestra `TATAGT`, el fragmento literal, `txt:p:0003` y `lines:10-10`.
+- Traza: `end_turn`, 3 rondas y 8 herramientas. TSS aparece como `INVALID_BACKEND_PAYLOAD`.
+- Credenciales: no hay una clave visible en el navegador, en la terminal ni en un archivo abierto.
+- Archivo: `runs/ui-live-01/SYNTH-UI-LIVE-01__narnZp9.json` existe. No lo edites durante la toma.
 
-- Procesamiento: `02-processing.png`. El botón está deshabilitado y las tarjetas siguen en «Sin resultado».
-- Resultado: `03-cards.png`.
-- Detalle del TSS: `04-detail.png`.
-- Traza: `05-trace.png`.
-- Archivo persistido: solo el nombre y el estado de las cuatro propiedades.
+Si la consulta no pinta las tarjetas, detén la grabación. No pulses «Extraer propiedades» para reconstruirlas.
+
+## Qué decir del resultado
+
+La frase obligatoria, al pulsar el botón: se está recuperando una extracción ya ejecutada con Anthropic. No se está ejecutando otra vez el modelo.
+
+TSS quedó en `INVALID_BACKEND_PAYLOAD` porque los identificadores de evidencia y los fragmentos no coincidían. El sistema no aceptó ese valor.
 
 ## Pruebas
 
-`./scripts/verify.sh` no llama a un proveedor. La compuerta de este HEAD pasó 628 pruebas. En el video, esas 628 son regresión. El README todavía cita 616 en un párrafo histórico: no leas ese número. Tampoco leas la frase antigua que dice que la rama no incluye interfaz.
+`./scripts/verify.sh` no llama a un proveedor. La compuerta de este HEAD pasó 639 pruebas. En el video, esas 639 son pruebas del software. El README todavía cita 616 en un párrafo histórico: no leas ese número. Tampoco leas la frase antigua que dice que la rama no incluye interfaz.
 
 ## Al terminar
 
-Detén Uvicorn. Confirma que el entorno de la terminal no tiene `ANTHROPIC_API_KEY` ni `OPENAI_API_KEY`. No hagas commit de capturas ni de `runs/`.
-
-## Recurso que falta para un único plano en vivo
-
-La página no tiene historial. No puede volver a dibujar `SYNTH-UI-LIVE-01` desde el JSON sin una petición nueva. La grabación del resultado usa las cinco capturas. El respaldo local está en `Documents/LIDR/promoter-ai-extraction/demo-evidence/`. Si `/tmp` se vacía, usa esas copias. No hagas otra llamada al proveedor para reconstruirlas.
+Detén Uvicorn. Confirma que la terminal no tiene `ANTHROPIC_API_KEY` ni `OPENAI_API_KEY`. No hagas commit de capturas ni de `runs/`.
