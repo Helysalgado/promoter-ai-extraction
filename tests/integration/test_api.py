@@ -23,6 +23,7 @@ from promoter_ai_extraction.extraction import (
     SafeExtractionInput,
 )
 from promoter_ai_extraction.models import Property
+from promoter_ai_extraction.retrieval import EmbedderUnavailable, MAX_RETRIEVED_CHARS
 
 _PARA = "The promoter lacZp1 TSS is -42."
 _HIDDEN = "UNIQUE_NOT_IN_EVIDENCE"
@@ -101,8 +102,25 @@ def _body(**overrides: object) -> dict[str, object]:
     return payload
 
 
-def _client(tmp_path: Path, backend: CountingBackend | ScriptedBackend | None = None) -> TestClient:
-    app = create_app(backend=backend, prediction_dir=tmp_path)
+class _IdenticalEmbedder:
+    """Same vector for every text, so a short fixture still keeps every segment."""
+
+    model_id = "synthetic-identical"
+
+    def embed(self, texts: list[str]) -> list[tuple[float, ...]]:
+        return [(1.0, 0.0) for _ in texts]
+
+
+def _client(
+    tmp_path: Path,
+    backend: CountingBackend | ScriptedBackend | None = None,
+    embedder: object | None = None,
+) -> TestClient:
+    app = create_app(
+        backend=backend,
+        prediction_dir=tmp_path,
+        embedder=embedder or _IdenticalEmbedder(),
+    )
     return TestClient(app)
 
 
@@ -287,7 +305,7 @@ def test_duplicate_prediction_is_409_without_another_call(tmp_path: Path) -> Non
 
 def test_concurrent_requests_do_not_overwrite_or_double_call(tmp_path: Path) -> None:
     backend = CountingBackend(_four(), delay_s=0.2)
-    app = create_app(backend=backend, prediction_dir=tmp_path)
+    app = create_app(backend=backend, prediction_dir=tmp_path, embedder=_IdenticalEmbedder())
     start = threading.Barrier(2)
 
     def post() -> int:
@@ -354,3 +372,158 @@ def test_http_path_does_not_import_gold_or_pass_it_to_the_backend(tmp_path: Path
     )
     assert response.status_code == 200
     assert "GT_para_referencia" not in response.text
+
+
+class _PhraseEmbedder:
+    model_id = "synthetic-phrase"
+
+    def embed(self, texts: list[str]) -> list[tuple[float, ...]]:
+        vectors: list[tuple[float, ...]] = []
+        for text in texts:
+            folded = text.casefold()
+            if "transcription start site of this promoter" in folded:
+                vectors.append((1.0, 0.0, 0.0, 0.0))
+            elif "minus 10 box of this promoter" in folded:
+                vectors.append((0.0, 1.0, 0.0, 0.0))
+            elif "minus 35 box of this promoter" in folded:
+                vectors.append((0.0, 0.0, 1.0, 0.0))
+            elif "sigma factor of this promoter" in folded:
+                vectors.append((0.0, 0.0, 0.0, 1.0))
+            else:
+                vectors.append((0.0, 0.0, 0.0, 0.0))
+        return vectors
+
+
+class _RecordingBackend:
+    def __init__(self, inner: ScriptedBackend) -> None:
+        self._inner = inner
+        self.inputs: list[SafeExtractionInput] = []
+
+    def generate(self, safe_input: SafeExtractionInput):
+        self.inputs.append(safe_input)
+        return self._inner.generate(safe_input)
+
+
+def test_extract_retrieves_each_property_without_sending_a_far_paragraph(tmp_path: Path) -> None:
+    anchor = "The promoter WidgetP, also called radC, is identified here."
+    neighbor = "Nearby regulatory context."
+    planted = {
+        Property.TSS: "The transcription start site of this promoter is -42.",
+        Property.CAJA_10: "The minus 10 box of this promoter is CATAAT.",
+        Property.CAJA_35: "The minus 35 box of this promoter is TTGAAA.",
+        Property.FACTOR_SIGMA: "The sigma factor of this promoter is RpoD.",
+    }
+    far = "FAR_SEGMENT_TEXT is unrelated metabolism."
+    document = "\n\n".join([anchor, neighbor, *planted.values(), far])
+    ids = {
+        text: f"txt:p:{index:04d}"
+        for index, text in enumerate([anchor, neighbor, *planted.values(), far])
+    }
+
+    def _cited(prop: Property) -> RawPropertyPayload:
+        if prop is Property.CAJA_10:
+            return _abstention()
+        fragment = planted[prop]
+        return RawPropertyPayload(
+            status="EXTRACTED",
+            values=(
+                RawValuePayload(
+                    value_raw="-42" if prop is Property.TSS else "kept",
+                    qualifier=None,
+                    evidence_segment_ids=(ids[fragment],),
+                    evidence_fragments=(fragment,),
+                ),
+            ),
+            candidates=(),
+            abstention_reason=None,
+            result_evidence=(),
+        )
+
+    backend = _RecordingBackend(
+        ScriptedBackend({prop: _cited(prop) for prop in Property})
+    )
+    response = _client(tmp_path, backend, embedder=_PhraseEmbedder()).post(
+        "/extract",
+        json=_body(
+            paper_id="PMC77",
+            promoter_name="WidgetP",
+            paper_gene_synonym="radC",
+            document=document,
+        ),
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert len(backend.inputs) == 4
+    by_property = {item.property: item for item in backend.inputs}
+    retrieval = body["retrieval"]["properties"]
+    for prop, fragment in planted.items():
+        seen = {segment.segment_id for segment in by_property[prop].document_segments}
+        assert ids[fragment] in seen
+        assert ids[anchor] in seen
+        assert ids[neighbor] in seen
+        assert retrieval[prop.value]["mode"] == "retrieved"
+        assert ids[fragment] in retrieval[prop.value]["segment_ids"]
+        assert ids[anchor] in retrieval[prop.value]["segment_ids"]
+    caja = body["properties"]["Caja -10"]
+    assert caja["kind"] == "scientific"
+    assert caja["status"] == "NOT_FOUND"
+    assert far not in response.text
+    stored = (tmp_path / "PMC77__WidgetP.json").read_text(encoding="utf-8")
+    assert far not in stored
+    assert "PMC77" in stored
+    assert '"retrieval"' in stored
+
+
+def test_over_budget_segment_is_insufficient_retrieval_not_not_found(tmp_path: Path) -> None:
+    backend = CountingBackend(_four())
+    response = _client(tmp_path, backend).post(
+        "/extract",
+        json=_body(document="a" * (MAX_RETRIEVED_CHARS + 1), paper_id="PMC12"),
+    )
+    assert response.status_code == 200
+    assert backend.calls == 0
+    for slot in response.json()["properties"].values():
+        assert slot["kind"] == "technical"
+        assert slot["code"] == "INSUFFICIENT_RETRIEVAL"
+        assert "status" not in slot
+    stored = (tmp_path / "PMC12__lacZp1.json").read_text(encoding="utf-8")
+    assert "a" * 100 not in stored
+    assert "INSUFFICIENT_RETRIEVAL" in stored
+
+
+def test_embedder_failure_does_not_call_the_provider(tmp_path: Path) -> None:
+    class _Boom:
+        def embed(self, texts: list[str]) -> list[tuple[float, ...]]:
+            raise EmbedderUnavailable("hidden-model-path")
+
+    backend = CountingBackend(_four())
+    response = _client(tmp_path, backend, embedder=_Boom()).post("/extract", json=_body())
+    assert response.status_code == 503
+    assert response.json()["code"] == "EMBEDDER_UNAVAILABLE"
+    assert "hidden-model-path" not in response.text
+    assert backend.calls == 0
+    assert list(tmp_path.glob("*.json")) == []
+
+
+def test_index_failure_does_not_call_the_provider(tmp_path: Path) -> None:
+    class _Empty:
+        def embed(self, texts: list[str]) -> list[tuple[float, ...]]:
+            return []
+
+    backend = CountingBackend(_four())
+    response = _client(tmp_path, backend, embedder=_Empty()).post("/extract", json=_body())
+    assert response.status_code == 500
+    assert response.json()["code"] == "RETRIEVAL_ERROR"
+    assert backend.calls == 0
+    assert list(tmp_path.glob("*.json")) == []
+
+
+def test_health_does_not_load_embeddings(tmp_path: Path) -> None:
+    class _Boom:
+        def embed(self, texts: list[str]) -> list[tuple[float, ...]]:
+            raise AssertionError("health must not embed")
+
+    app = create_app(prediction_dir=tmp_path, embedder=_Boom())
+    response = TestClient(app).get("/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"

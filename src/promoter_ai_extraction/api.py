@@ -36,6 +36,13 @@ from promoter_ai_extraction.models import (
     TechnicalFailure,
 )
 from promoter_ai_extraction.persistence import PersistenceFailure, PredictionStore
+from promoter_ai_extraction.retrieval import (
+    Embedder,
+    EmbedderUnavailable,
+    FastEmbedEmbedder,
+    RetrievalFailure,
+    prepare_document_retrieval,
+)
 from promoter_ai_extraction.validation import OutputValidator
 
 MAX_DOCUMENT_CHARS = 100_000
@@ -86,10 +93,12 @@ def create_app(
     *,
     backend: ModelBackend | None = None,
     prediction_dir: Path | None = None,
+    embedder: Embedder | None = None,
 ) -> FastAPI:
-    """Build the app. An injected backend is for tests and skips credentials."""
+    """Build the app. Injected backend and embedder are for tests."""
     app = FastAPI(title="promoter-ai-extraction", version=__version__)
     app.state.backend = backend
+    app.state.embedder = embedder if embedder is not None else FastEmbedEmbedder()
     app.state.store = PredictionStore(
         prediction_dir or Path(os.environ.get("PREDICTION_DIR", "runs/http"))
     )
@@ -125,14 +134,6 @@ def create_app(
         with _lock_for(request.app, run_id):
             if store.exists(run_id):
                 return _conflict()
-            active = request.app.state.backend
-            model_id: str | None = None
-            if active is None:
-                built = _live_backend(body.provider, body.max_output_tokens)
-                if isinstance(built, JSONResponse):
-                    return built
-                active = built
-                model_id = OPENAI_MODEL_ID if body.provider == "openai" else ANTHROPIC_MODEL_ID
             loaded = DocumentLoader().load(
                 DocumentSource(
                     paper_id=body.paper_id,
@@ -147,9 +148,33 @@ def create_app(
                     loaded.code,
                     _LOAD_MESSAGES.get(loaded.code, "The document could not be read."),
                 )
+            try:
+                retrieval = prepare_document_retrieval(
+                    loaded,
+                    request.app.state.embedder,
+                    promoter_name=body.promoter_name,
+                    paper_gene_synonym=body.paper_gene_synonym,
+                )
+            except EmbedderUnavailable:
+                return _error(
+                    503,
+                    "EMBEDDER_UNAVAILABLE",
+                    "The embedding model is not available.",
+                )
+            except RetrievalFailure:
+                return _error(500, "RETRIEVAL_ERROR", "The document could not be indexed.")
+            active = request.app.state.backend
+            model_id: str | None = None
+            if active is None:
+                built = _live_backend(body.provider, body.max_output_tokens)
+                if isinstance(built, JSONResponse):
+                    return built
+                active = built
+                model_id = OPENAI_MODEL_ID if body.provider == "openai" else ANTHROPIC_MODEL_ID
             service = GuidedExtractionService(
                 PropertyExtractor(backend=active, validator=OutputValidator()),
                 ExtractionRequestFactory(),
+                retrieval,
             )
             run = service.run(
                 loaded,
@@ -158,14 +183,24 @@ def create_app(
                 paper_gene_synonym=body.paper_gene_synonym,
                 run_id=run_id,
             )
-            saved = store.save(run, document_hash=loaded.document_hash)
+            trace = retrieval.public_trace()
+            saved = store.save(
+                run,
+                document_hash=loaded.document_hash,
+                system_fingerprint={"retrieval": trace},
+            )
             if isinstance(saved, PersistenceFailure):
                 if saved.code == "FILE_EXISTS":
                     return _conflict()
                 return _error(500, "WRITE_ERROR", "The prediction could not be stored.")
         return JSONResponse(
             status_code=200,
-            content=_public_run(run, provider=body.provider, model=model_id),
+            content=_public_run(
+                run,
+                provider=body.provider,
+                model=model_id,
+                retrieval=trace,
+            ),
         )
 
     return app
@@ -197,13 +232,20 @@ def _lock_for(app: FastAPI, run_id: str) -> threading.Lock:
         return lock
 
 
-def _public_run(run: ExtractionRun, *, provider: str, model: str | None) -> dict[str, object]:
+def _public_run(
+    run: ExtractionRun,
+    *,
+    provider: str,
+    model: str | None,
+    retrieval: dict[str, object],
+) -> dict[str, object]:
     return {
         "run_id": run.run_id,
         "paper_id": run.paper_id,
         "promoter_name": run.promoter_name,
         "provider": provider,
         "model": model,
+        "retrieval": retrieval,
         "properties": {
             "TSS": _public_attempt(run.tss),
             "Caja -10": _public_attempt(run.caja_10),
