@@ -150,12 +150,71 @@ class TestTssNormalization:
         assert result.value_normalized == "12"
         assert result.derivation_note is None
 
-    def test_typographic_minus_inside_prose_is_not_rewritten(self) -> None:
-        """Folding applies only to a whole signed-integer token, not a sentence."""
-        raw = "initiation site \u03ea12 bp from the proposed start codon"
+    def test_typographic_minus_inside_unanchored_prose_is_not_rewritten(self) -> None:
+        """A glyph inside prose is not a signed integer unless it is a distance clause."""
+        raw = "The figure legend marks position \u03ea12 on the gel."
         result = normalize_tss(raw)
         assert result.value_normalized == raw
         assert "\u03ea" in result.value_normalized
+
+    @pytest.mark.parametrize(
+        "raw,expected",
+        [
+            ("-12 bp from the proposed radC start codon", "-12"),
+            (
+                "initiation site \u03ea12 bp from the proposed start codon for radC",
+                "-12",
+            ),
+            (
+                "-12 bp from the start codon (primer extension product of 123 nt)",
+                "-12",
+            ),
+            ("\u221212 bp from the start codon", "-12"),
+            ("42 bp upstream of the start codon", "-42"),
+            ("12 bp downstream of the initiation codon", "+12"),
+        ],
+    )
+    def test_explicit_translation_distance_becomes_signed_integer(
+        self, raw: str, expected: str
+    ) -> None:
+        """A bp distance tied to a translation-start anchor becomes one integer."""
+        original = raw
+        result = normalize_tss(raw)
+        assert result.value_normalized == expected
+        assert result.derivation_note is not None
+        assert raw == original
+
+    def test_from_without_sign_does_not_invent_a_sign(self) -> None:
+        """`from` plus an anchor is not enough to choose upstream or downstream."""
+        raw = "42 bp from the start codon"
+        result = normalize_tss(
+            raw,
+            anchor_context="upstream of the translation start",
+        )
+        assert result.value_normalized == raw
+        assert result.derivation_note is None
+
+    def test_experimental_product_length_is_not_a_tss_distance(self) -> None:
+        """A primer-extension product in nt is not a position relative to translation."""
+        raw = "123 nt upstream of the start codon"
+        result = normalize_tss(raw)
+        assert result.value_normalized == raw
+
+    def test_incompatible_distances_are_not_collapsed(self) -> None:
+        """Two different anchored distances stay as prose."""
+        raw = (
+            "about 8 bp upstream of the start codon; "
+            "-12 bp from the start codon"
+        )
+        result = normalize_tss(raw)
+        assert result.value_normalized == raw
+        assert result.derivation_note is None
+
+    def test_explicit_sign_conflicting_with_direction_is_not_resolved(self) -> None:
+        """A plus sign on an upstream clause is not rewritten to either sign."""
+        raw = "+12 bp upstream of the start codon"
+        result = normalize_tss(raw)
+        assert result.value_normalized == raw
 
 
 # ─── Box sequence normalization ───────────────────────────────────────────────

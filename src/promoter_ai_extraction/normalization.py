@@ -78,10 +78,26 @@ _SIGNED_INTEGER_RE = re.compile(r"^[+-]?\d+$")
 # U+03EA (Coptic gangia / GROBID minus) and U+2212 (MINUS SIGN).
 _TYPOGRAPHIC_MINUS = frozenset({"\u03ea", "\u2212"})
 _TSS_DISTANCE_RE = re.compile(
-    r"^(?P<distance>\d+)\s*(?:bp|nt|nucleotides?)?\s+"
+    r"^(?P<distance>\d+)\s*(?:bp)?\s+"
     r"(?P<direction>upstream|downstream)(?P<context>.*)$",
     re.IGNORECASE,
 )
+_TSS_ANCHOR = (
+    r"(?:translation(?:al)?\s+start|start\s+codon|initiation\s+codon|"
+    r"gene\s+start|ATG)"
+)
+# Distance, relation, and anchor must sit in one clause. The gap allows a
+# short modifier such as "proposed radC" and does not cross punctuation.
+_TSS_CLAUSE_RE = re.compile(
+    r"(?P<sign>[+\-\u03ea\u2212])?\s*"
+    r"(?P<distance>\d+)\s*bp\s+"
+    r"(?P<relation>upstream\s+of|downstream\s+of|from)\s+"
+    r"(?:the\s+)?"
+    r"(?:[\w]+\s+){0,6}?"
+    rf"(?P<anchor>{_TSS_ANCHOR})\b",
+    re.IGNORECASE,
+)
+_CLAUSE_CONFLICT = object()
 _TRANSLATION_ANCHOR_RE = re.compile(
     r"\b(?:translation(?:al)?\s+start|start\s+codon|initiation\s+codon|"
     r"gene\s+start|ATG)\b",
@@ -103,6 +119,11 @@ def normalize_tss(raw: str, *, anchor_context: str | None = None) -> Normalizati
     - A documentary upstream/downstream distance is signed only when the raw
       form or the explicitly supplied context names an approved
       translation-start anchor.
+    - One ``bp`` distance in the same clause as an approved anchor becomes a
+      signed integer. An explicit sign is kept. ``upstream`` and
+      ``downstream`` supply a sign only when the clause has none. ``from``
+      without a sign does not. Product lengths in ``nt`` are not distances.
+      Two disagreeing distances are left unchanged.
 
     Not permitted
     -------------
@@ -132,6 +153,18 @@ def normalize_tss(raw: str, *, anchor_context: str | None = None) -> Normalizati
         )
         return NormalizationResult(value_normalized=folded, derivation_note=note)
 
+    anchored, blocked = _anchored_bp_distance(stripped)
+    if blocked:
+        return NormalizationResult(value_normalized=stripped, derivation_note=None)
+    if anchored is not None:
+        return NormalizationResult(
+            value_normalized=anchored,
+            derivation_note=(
+                "documentary bp distance normalized to a signed integer at the "
+                "explicit translation-start anchor"
+            ),
+        )
+
     distance_match = _TSS_DISTANCE_RE.match(stripped)
     if distance_match:
         documentary_context = " ".join(
@@ -155,6 +188,48 @@ def normalize_tss(raw: str, *, anchor_context: str | None = None) -> Normalizati
 
     # All other forms: preserve the stripped raw form unchanged (TSS-04).
     return NormalizationResult(value_normalized=stripped, derivation_note=None)
+
+
+def _anchored_bp_distance(stripped: str) -> tuple[str | None, bool]:
+    """Return one agreed signed distance, and whether the clause set is blocked.
+
+    A block means two usable distances disagree, or a sign contradicts
+    ``upstream`` or ``downstream``. The caller must keep the raw phrase.
+    """
+    found: list[str] = []
+    blocked = False
+    for match in _TSS_CLAUSE_RE.finditer(stripped):
+        interpreted = _interpret_distance_clause(match)
+        if interpreted is _CLAUSE_CONFLICT:
+            blocked = True
+        elif isinstance(interpreted, str):
+            found.append(interpreted)
+    unique = set(found)
+    if blocked or len(unique) > 1:
+        return None, True
+    if len(unique) == 1:
+        return next(iter(unique)), False
+    return None, False
+
+
+def _interpret_distance_clause(match: re.Match[str]) -> str | object | None:
+    """Map one distance clause to a signed integer, or skip it.
+
+    ``from`` without an explicit sign is not a usable distance. An explicit
+    sign that disagrees with ``upstream`` or ``downstream`` is a conflict.
+    """
+    relation = re.sub(r"\s+", " ", match.group("relation").lower())
+    inferred = {"upstream of": "-", "downstream of": "+"}.get(relation)
+    sign = match.group("sign")
+    distance = match.group("distance")
+    if sign is None:
+        if inferred is None:
+            return None
+        return f"{inferred}{distance}"
+    explicit = "-" if sign == "-" or sign in _TYPOGRAPHIC_MINUS else "+"
+    if inferred is not None and inferred != explicit:
+        return _CLAUSE_CONFLICT
+    return f"{explicit}{distance}"
 
 
 def _fold_typographic_integer_sign(stripped: str) -> tuple[str, bool]:
