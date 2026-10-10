@@ -9,6 +9,8 @@ dependencies = [
     "defusedxml>=0.7",
     "openai>=3.26.1",
     "anthropic>=1.13.0",
+    "fastapi>=0.143.0",
+    "uvicorn>=0.54.0",
 ]
 
 [build-system]
