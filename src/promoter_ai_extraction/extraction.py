@@ -500,6 +500,36 @@ _PROPERTY_ORDER: tuple[Property, ...] = (
 )
 
 
+class PropertyContextSource(Protocol):
+    """Chooses the segments one property may see. The default keeps all of them."""
+
+    def context_for(
+        self,
+        document: LoadedDocument,
+        prop: Property,
+        *,
+        promoter_name: str,
+        paper_gene_synonym: str | None,
+    ) -> tuple[DocumentSegment, ...] | TechnicalFailure:
+        """Return original segments, or a technical failure that skips the model."""
+        ...
+
+
+class FullDocumentContext:
+    """Context used by the CLI: every loaded segment, in document order."""
+
+    def context_for(
+        self,
+        document: LoadedDocument,
+        prop: Property,
+        *,
+        promoter_name: str,
+        paper_gene_synonym: str | None,
+    ) -> tuple[DocumentSegment, ...] | TechnicalFailure:
+        del prop, promoter_name, paper_gene_synonym
+        return document.segments
+
+
 class GuidedExtractionService:
     """Sequential four-property orchestrator for one paper × promoter pair.
 
@@ -512,15 +542,20 @@ class GuidedExtractionService:
     A technical failure in any one property attempt does **not** prevent the
     remaining three from being attempted.  All four slots in the returned
     ``ExtractionRun`` are always populated.
+
+    An optional context source may narrow segments per property. The default
+    source passes the full document through, which is the CLI behaviour.
     """
 
     def __init__(
         self,
         extractor: PropertyExtractor,
         request_factory: ExtractionRequestFactory,
+        context_source: PropertyContextSource | None = None,
     ) -> None:
         self._extractor = extractor
         self._factory = request_factory
+        self._context = context_source if context_source is not None else FullDocumentContext()
 
     def run(
         self,
@@ -587,10 +622,31 @@ class GuidedExtractionService:
         prop: Property,
     ) -> PropertyAttempt:
         """Run a single property extraction attempt, catching factory errors."""
+        selected = self._context.context_for(
+            document,
+            prop,
+            promoter_name=promoter_name,
+            paper_gene_synonym=paper_gene_synonym,
+        )
+        if isinstance(selected, TechnicalFailure):
+            return selected
+        if not selected:
+            return TechnicalFailure(
+                stage="retrieval",
+                code="INSUFFICIENT_RETRIEVAL",
+                message="No usable context was retrieved for this property.",
+                cause="EmptyContext",
+            )
+        view = LoadedDocument(
+            paper_id=document.paper_id,
+            format=document.format,
+            segments=selected,
+            document_hash=document.document_hash,
+        )
         try:
             request = self._factory.create(
                 {
-                    "document": document,
+                    "document": view,
                     "paper_id": paper_id,
                     "promoter_name": promoter_name,
                     "promoter_id": promoter_id,

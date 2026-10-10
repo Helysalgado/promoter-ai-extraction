@@ -9,6 +9,9 @@ dependencies = [
     "defusedxml>=0.7",
     "openai>=3.26.1",
     "anthropic>=1.13.0",
+    "fastapi>=0.143.0",
+    "uvicorn>=0.54.0",
+    "fastembed>=0.9.0",
 ]
 
 [build-system]
@@ -17,6 +20,11 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/promoter_ai_extraction"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/promoter_ai_extraction/ui/index.html" = "promoter_ai_extraction/ui/index.html"
+"src/promoter_ai_extraction/ui/app.css" = "promoter_ai_extraction/ui/app.css"
+"src/promoter_ai_extraction/ui/app.js" = "promoter_ai_extraction/ui/app.js"
 
 [dependency-groups]
 dev = [

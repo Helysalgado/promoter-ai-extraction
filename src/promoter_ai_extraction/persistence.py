@@ -382,6 +382,14 @@ def _sha256_of(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
+def _run_id_is_safe(run_id: str) -> bool:
+    """Reject an identifier that could address a path outside the store."""
+    if not isinstance(run_id, str) or not run_id or run_id != run_id.strip():
+        return False
+    forbidden = ("/", "\\", ":", "..", "\x00")
+    return not any(token in run_id for token in forbidden)
+
+
 class PredictionStore:
     """Write-once atomic local JSON prediction store.
 
@@ -409,6 +417,105 @@ class PredictionStore:
         # Sanitize run_id: replace filesystem-unsafe characters.
         safe_id = run_id.replace("/", "_").replace("\\", "_").replace(":", "_")
         return self._store_dir / f"{safe_id}.json"
+
+    def exists(self, run_id: str) -> bool:
+        """Return whether a prediction file for *run_id* is already stored."""
+        return self._target_path(run_id).is_file()
+
+    def read(self, run_id: str) -> VerifiedPersistedPrediction | PersistenceFailure:
+        """Load one prediction by ``run_id`` without writing the file.
+
+        The identifier is a single name. Slashes, backslashes, colons, and
+        ``..`` are rejected. A symlink is read only when its target stays
+        inside this store directory.
+        """
+        if not _run_id_is_safe(run_id):
+            return PersistenceFailure(
+                stage="load",
+                code="INVALID_REQUEST",
+                message="The prediction identifier is not valid.",
+                cause="InvalidRunId",
+            )
+        target = self._target_path(run_id)
+        root = self._store_dir.resolve()
+        try:
+            resolved = target.resolve()
+            resolved.relative_to(root)
+        except (OSError, ValueError):
+            return PersistenceFailure(
+                stage="load",
+                code="INVALID_REQUEST",
+                message="The prediction identifier is not valid.",
+                cause="PathEscape",
+            )
+        if not target.is_file():
+            return PersistenceFailure(
+                stage="load",
+                code="FILE_NOT_FOUND",
+                message="No saved prediction exists for this identity.",
+                cause="FileNotFoundError",
+            )
+        try:
+            data = target.read_bytes()
+        except FileNotFoundError:
+            return PersistenceFailure(
+                stage="load",
+                code="FILE_NOT_FOUND",
+                message="No saved prediction exists for this identity.",
+                cause="FileNotFoundError",
+            )
+        except OSError as exc:
+            return PersistenceFailure(
+                stage="load",
+                code="LOAD_ERROR",
+                message="The saved prediction could not be read from disk.",
+                cause=type(exc).__name__,
+            )
+        try:
+            record: dict[str, Any] = json.loads(data.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            return PersistenceFailure(
+                stage="load",
+                code="CORRUPT_RECORD",
+                message="The saved prediction could not be read.",
+                cause=type(exc).__name__,
+            )
+        schema_v = record.get("schema_version")
+        if schema_v != SCHEMA_VERSION:
+            return PersistenceFailure(
+                stage="load",
+                code="UNSUPPORTED_SCHEMA",
+                message="The saved prediction uses an unsupported schema.",
+                cause="SchemaVersionError",
+            )
+        try:
+            run = deserialize_run(record)
+        except (KeyError, ValueError, TypeError) as exc:
+            return PersistenceFailure(
+                stage="load",
+                code="CORRUPT_RECORD",
+                message="The saved prediction could not be read.",
+                cause=type(exc).__name__,
+            )
+        if run.run_id != run_id:
+            return PersistenceFailure(
+                stage="load",
+                code="CORRUPT_RECORD",
+                message="The saved prediction could not be read.",
+                cause="IdentityMismatch",
+            )
+        return VerifiedPersistedPrediction(
+            ref=PersistedPredictionRef(
+                run_id=run.run_id,
+                file_path=str(resolved),
+                schema_version=SCHEMA_VERSION,
+                content_hash=_sha256_of(data),
+            ),
+            run=run,
+            created_at=record.get("created_at"),
+            document_hash=record.get("document_hash"),
+            system_fingerprint=record.get("system_fingerprint"),
+        )
 
     def save(
         self,
@@ -457,21 +564,34 @@ class PredictionStore:
             data = json_str.encode("utf-8")
             content_hash = _sha256_of(data)
 
-            # Atomic write: temp file in same directory → rename.
+            # Atomic no-overwrite: link the temp file onto the target.
+            # os.link fails with EEXIST if the target appeared concurrently,
+            # so a second writer cannot replace the first file.
             fd, tmp_path_str = tempfile.mkstemp(
                 dir=self._store_dir, prefix=".tmp_pred_", suffix=".json"
             )
             try:
                 with os.fdopen(fd, "wb") as fh:
                     fh.write(data)
-                os.replace(tmp_path_str, str(target))
-            except Exception:
-                # Clean up temp file if rename failed.
+                    fh.flush()
+                    os.fsync(fh.fileno())
+                try:
+                    os.link(tmp_path_str, target)
+                except FileExistsError:
+                    return PersistenceFailure(
+                        stage="write",
+                        code="FILE_EXISTS",
+                        message=(
+                            f"A persisted prediction for run_id {run.run_id!r} already "
+                            f"exists at {target}. Overwriting is not permitted."
+                        ),
+                        cause="FileExistsError",
+                    )
+            finally:
                 try:
                     os.unlink(tmp_path_str)
                 except OSError:
                     pass
-                raise
 
         except Exception as exc:
             return PersistenceFailure(
