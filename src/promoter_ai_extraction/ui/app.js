@@ -131,7 +131,8 @@ function badgeFor(attempt) {
   const status = attempt.status || "";
   const labels = UI_RULES.statusLabels;
   const known = Object.prototype.hasOwnProperty.call(labels, status);
-  return { tone: "scientific", label: known ? labels[status] : status, code: status };
+  const tone = status === "EXTRACTED" ? "extracted" : "abstained";
+  return { tone: tone, label: known ? labels[status] : status, code: status };
 }
 
 function summaryFor(attempt) {
@@ -146,13 +147,18 @@ function summaryFor(attempt) {
   return parts.filter(Boolean).join(" · ");
 }
 
-function addRow(parent, label, value) {
+function addRow(parent, label, value, kind) {
   if (value === null || value === undefined || value === "") return;
-  const row = document.createElement("p");
-  const strong = document.createElement("strong");
-  strong.textContent = label;
-  row.appendChild(strong);
-  row.appendChild(document.createTextNode(" " + String(value)));
+  const row = document.createElement("div");
+  row.className = kind ? "fact " + kind : "fact";
+  const term = document.createElement("span");
+  term.className = "fact-label";
+  term.textContent = label;
+  const detail = document.createElement("span");
+  detail.className = "fact-value";
+  detail.textContent = String(value);
+  row.appendChild(term);
+  row.appendChild(detail);
   parent.appendChild(row);
 }
 
@@ -167,7 +173,8 @@ function region(kind) {
 function renderEvidence(item, parent) {
   if (!item) return;
   const block = document.createElement("div");
-  addRow(block, "Fragmento", item.fragment);
+  block.className = "evidence";
+  addRow(block, "Fragmento", item.fragment, "fragment");
   addRow(block, "Segmento", item.segment_id);
   addRow(block, "Ubicación", item.location);
   addRow(block, "Tipo de fuente", item.source_type);
@@ -218,13 +225,23 @@ function renderDetail() {
   for (let index = 0; index < values.length; index += 1) {
     renderAccepted(values[index], accepted);
   }
-  if (accepted.childNodes.length) detail.appendChild(accepted);
+  if (accepted.childNodes.length) {
+    const title = document.createElement("h3");
+    title.textContent = "Valores aceptados";
+    detail.appendChild(title);
+    detail.appendChild(accepted);
+  }
   const rejected = region("rejected");
   const candidates = attempt.candidates || [];
   for (let index = 0; index < candidates.length; index += 1) {
     renderRejected(candidates[index], rejected);
   }
-  if (rejected.childNodes.length) detail.appendChild(rejected);
+  if (rejected.childNodes.length) {
+    const title = document.createElement("h3");
+    title.textContent = "Candidatos rechazados";
+    detail.appendChild(title);
+    detail.appendChild(rejected);
+  }
 }
 
 function renderCards() {
@@ -238,33 +255,62 @@ function renderCards() {
     const status = card.querySelector(".status");
     status.textContent = badge.label;
     status.className = "status tone-" + badge.tone;
+    card.setAttribute("data-tone", badge.tone);
     card.querySelector(".summary").textContent = summaryFor(attempt);
     card.setAttribute("aria-pressed", name === state.selected ? "true" : "false");
   }
 }
 
+function appendStep(list, label, value) {
+  const item = document.createElement("li");
+  const term = document.createElement("span");
+  term.className = "fact-label";
+  term.textContent = label;
+  const detail = document.createElement("span");
+  detail.className = "fact-value";
+  detail.textContent = value;
+  item.appendChild(term);
+  item.appendChild(document.createTextNode(" "));
+  item.appendChild(detail);
+  list.appendChild(item);
+}
+
 function renderAgentTrace(agent, host) {
-  addRow(host, "Terminación", agent.termination);
-  addRow(host, "Rondas", agent.rounds);
-  addRow(host, "Herramientas", agent.tool_executions);
+  const metrics = document.createElement("div");
+  metrics.className = "trace-metrics";
+  addRow(metrics, "Terminación", agent.termination);
+  addRow(metrics, "Rondas", agent.rounds);
+  addRow(metrics, "Herramientas", agent.tool_executions);
+  host.appendChild(metrics);
   const steps = agent.steps || [];
+  if (!steps.length) return;
+  const list = document.createElement("ol");
+  list.className = "trace-steps";
   for (let index = 0; index < steps.length; index += 1) {
     const step = steps[index];
     const result = step.result || {};
     const mark = result.status || result.code || result.kind || "";
-    addRow(host, step.tool || "herramienta", (step.property || "") + " " + mark);
+    appendStep(list, step.tool || "herramienta", (step.property || "") + " " + mark);
   }
+  host.appendChild(list);
 }
 
 function renderRetrievalTrace(retrieval, host) {
-  addRow(host, "Modelo de embeddings", retrieval.embedding_model);
+  const metrics = document.createElement("div");
+  metrics.className = "trace-metrics";
+  addRow(metrics, "Modelo de embeddings", retrieval.embedding_model);
+  host.appendChild(metrics);
   const properties = retrieval.properties || {};
   const names = Object.keys(properties);
+  if (!names.length) return;
+  const list = document.createElement("ul");
+  list.className = "trace-steps";
   for (let index = 0; index < names.length; index += 1) {
     const item = properties[names[index]] || {};
     const ids = (item.segment_ids || []).join(", ");
-    addRow(host, names[index], (item.mode || "") + " " + ids);
+    appendStep(list, names[index], (item.mode || "") + " " + ids);
   }
+  host.appendChild(list);
 }
 
 function renderTrace(body) {
@@ -311,6 +357,9 @@ function onFile() {
   state.document = "";
   state.format = "";
   if (!file) {
+    document.getElementById("file-name").textContent = "Ningún archivo seleccionado";
+    document.getElementById("file-size").textContent = "";
+    document.getElementById("document-format").textContent = "—";
     refreshRunButton();
     return;
   }

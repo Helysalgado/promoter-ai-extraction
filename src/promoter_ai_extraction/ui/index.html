@@ -3,88 +3,104 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>promoter-ai-extraction</title>
+  <title>Extracción de promotores</title>
   <link rel="stylesheet" href="/ui/app.css">
 </head>
 <body>
   <header class="masthead">
-    <h1>promoter-ai-extraction</h1>
-    <p>Extracción con evidencia. La referencia curatorial no entra en esta pantalla.</p>
+    <p class="kicker">promoter-ai-extraction</p>
+    <h1>Extracción de promotores</h1>
+    <p class="lede">Cuatro propiedades con evidencia. La referencia curatorial no entra en esta pantalla.</p>
   </header>
 
-  <form id="extract-form" class="panel">
-    <fieldset>
-      <legend>Artículo</legend>
-      <label for="article">Archivo TXT, XML, TEI o .tei.xml</label>
-      <input id="article" name="article" type="file" accept=".txt,.xml,.tei,.tei.xml">
-      <p id="file-name">Ningún archivo seleccionado</p>
-      <p id="file-size"></p>
-      <p>Formato detectado: <strong id="document-format">—</strong></p>
-      <label for="paper-id">PMID/ID</label>
-      <input id="paper-id" name="paper_id" type="text" autocomplete="off" required>
-    </fieldset>
+  <form id="extract-form" class="workspace">
+    <div class="form-main">
+      <fieldset>
+        <legend>Artículo</legend>
+        <label for="article">Archivo TXT, XML, TEI o .tei.xml</label>
+        <input id="article" name="article" type="file" accept=".txt,.xml,.tei,.tei.xml">
+        <div class="file-meta">
+          <p id="file-name">Ningún archivo seleccionado</p>
+          <p id="file-size"></p>
+          <p>Formato detectado: <strong id="document-format">—</strong></p>
+        </div>
+        <label for="paper-id">PMID/ID</label>
+        <input id="paper-id" name="paper_id" type="text" autocomplete="off" required>
+      </fieldset>
 
-    <fieldset>
-      <legend>Promotor</legend>
-      <label for="promoter-name">Nombre</label>
-      <input id="promoter-name" name="promoter_name" type="text" autocomplete="off" required>
-      <label for="promoter-id">Identificador <span class="optional">opcional</span></label>
-      <input id="promoter-id" name="promoter_id" type="text" autocomplete="off">
-      <label for="paper-gene-synonym">Sinónimo del gen <span class="optional">opcional</span></label>
-      <input id="paper-gene-synonym" name="paper_gene_synonym" type="text" autocomplete="off">
-    </fieldset>
+      <fieldset>
+        <legend>Promotor</legend>
+        <label for="promoter-name">Nombre</label>
+        <input id="promoter-name" name="promoter_name" type="text" autocomplete="off" required>
+        <div class="field-pair">
+          <div>
+            <label for="promoter-id">Identificador <span class="optional">opcional</span></label>
+            <input id="promoter-id" name="promoter_id" type="text" autocomplete="off">
+          </div>
+          <div>
+            <label for="paper-gene-synonym">Sinónimo del gen <span class="optional">opcional</span></label>
+            <input id="paper-gene-synonym" name="paper_gene_synonym" type="text" autocomplete="off">
+          </div>
+        </div>
+      </fieldset>
+    </div>
 
-    <fieldset>
-      <legend>Método</legend>
-      <label><input type="radio" name="method" value="guided" checked> Extracción guiada</label>
-      <label><input type="radio" name="method" value="agent"> Agente</label>
-      <label for="provider">Proveedor</label>
-      <select id="provider" name="provider">
-        <option value="openai">OpenAI</option>
-        <option value="anthropic">Anthropic</option>
-      </select>
-    </fieldset>
-
-    <p class="notice">Esta acción envía el documento al proveedor y consume su API. No se reintenta sola.</p>
-    <p class="notice">Cambiar el método o el proveedor no evita el error 409 para el mismo artículo y el mismo promotor.</p>
-    <label class="confirm">
-      <input id="confirm-call" type="checkbox">
-      Confirmo una sola llamada al proveedor.
-    </label>
-    <button id="run" type="submit" disabled>Extraer propiedades</button>
-    <button id="load-saved" type="button" disabled>Consultar resultado guardado</button>
-    <p id="status" role="status" aria-live="polite"></p>
+    <div class="form-side">
+      <fieldset class="execution">
+        <legend>Ejecución</legend>
+        <div class="choices">
+          <label><input type="radio" name="method" value="guided" checked> Extracción guiada</label>
+          <label><input type="radio" name="method" value="agent"> Agente</label>
+        </div>
+        <label for="provider">Proveedor</label>
+        <select id="provider" name="provider">
+          <option value="openai">OpenAI</option>
+          <option value="anthropic">Anthropic</option>
+        </select>
+        <p class="notice">Esta acción envía el documento al proveedor y consume su API. No se reintenta sola.</p>
+        <p class="notice">Cambiar el método o el proveedor no evita el error 409 para el mismo artículo y el mismo promotor.</p>
+        <label class="confirm">
+          <input id="confirm-call" type="checkbox">
+          Confirmo una sola llamada al proveedor.
+        </label>
+        <div class="action-row">
+          <button id="run" type="submit" disabled>Extraer propiedades</button>
+          <button id="load-saved" type="button" disabled>Consultar resultado guardado</button>
+        </div>
+        <p id="status" role="status" aria-live="polite"></p>
+      </fieldset>
+    </div>
   </form>
 
   <section class="results" aria-label="Resultados por propiedad">
     <h2>Resultados</h2>
     <div class="cards">
-      <button type="button" class="card" data-property="TSS" aria-pressed="false" aria-controls="detail">
+      <button type="button" class="card" data-tone="empty" data-property="TSS" aria-pressed="false" aria-controls="detail">
         <span class="name">TSS</span>
-        <span class="status">Sin resultado</span>
         <span class="summary"></span>
+        <span class="status tone-empty">Sin resultado</span>
       </button>
-      <button type="button" class="card" data-property="Caja -10" aria-pressed="false" aria-controls="detail">
+      <button type="button" class="card" data-tone="empty" data-property="Caja -10" aria-pressed="false" aria-controls="detail">
         <span class="name">Caja −10</span>
-        <span class="status">Sin resultado</span>
         <span class="summary"></span>
+        <span class="status tone-empty">Sin resultado</span>
       </button>
-      <button type="button" class="card" data-property="Caja -35" aria-pressed="false" aria-controls="detail">
+      <button type="button" class="card" data-tone="empty" data-property="Caja -35" aria-pressed="false" aria-controls="detail">
         <span class="name">Caja −35</span>
-        <span class="status">Sin resultado</span>
         <span class="summary"></span>
+        <span class="status tone-empty">Sin resultado</span>
       </button>
-      <button type="button" class="card" data-property="Factor sigma" aria-pressed="false" aria-controls="detail">
+      <button type="button" class="card" data-tone="empty" data-property="Factor sigma" aria-pressed="false" aria-controls="detail">
         <span class="name">Factor sigma</span>
-        <span class="status">Sin resultado</span>
         <span class="summary"></span>
+        <span class="status tone-empty">Sin resultado</span>
       </button>
     </div>
   </section>
 
-  <section id="detail" class="panel" aria-live="polite">
+  <section id="detail" class="panel sheet" aria-live="polite">
     <h2>Evidencia y trazabilidad</h2>
-    <p>Selecciona una propiedad para ver el detalle.</p>
+    <p class="placeholder">Selecciona una propiedad para ver el detalle.</p>
   </section>
 
   <details id="trace" class="panel">
