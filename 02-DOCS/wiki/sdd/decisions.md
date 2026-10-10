@@ -281,3 +281,15 @@ The real file `02-DOCS/data/safe-development-manifest.json` lives only in the ma
 Why: the default benchmark path stays unchanged, and the controlled run can cap output and retries without a second code path.
 
 Status: local. Not checkpointed. No live OpenAI call.
+
+## 2026-10-09 — Anthropic as a second provider
+
+Context: LIDR delivery needs Claude Sonnet beside the existing OpenAI adapter. The scientific payload contract stays one. OpenAI remains the default so the current CLI path does not change.
+
+Options: a second extractor; a gateway that falls back from Anthropic to OpenAI; one `ModelBackend` adapter that reuses the existing prompt, schema, and payload mapper.
+
+Decision: `AnthropicModelBackend` implements `ModelBackend`. `PropertyExtractor`, normalization, persistence, and evaluation are unchanged. The Messages request uses `output_config.format` with `type: json_schema` and the shared strict payload schema. The model id is `claude-sonnet-5-5`. The credential is `ANTHROPIC_API_KEY`. The adapter default is `max_tokens=4096`; `--max-output-tokens` overrides it. The live client sets `max_retries=0`. There is no fallback. `--provider` defaults to `openai`, whose default cap stays 128000. Provider, model, and the effective cap are stored in reproducibility `generation` metadata. Rate limits, provider errors, `max_tokens` stops, refusals, and schema errors are technical failures.
+
+Why: one extraction contract, two providers, and the OpenAI baseline command stays the same when the new flag is omitted.
+
+Status: local. Not checkpointed. No live Anthropic or OpenAI call.

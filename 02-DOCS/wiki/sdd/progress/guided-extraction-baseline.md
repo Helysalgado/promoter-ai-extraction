@@ -473,3 +473,12 @@ slug: guided-extraction-baseline
 - blocker: the live run is still not authorized.
 - note: no OpenAI call, no gold edit, no commit.
 
+## Anthropic provider — 2026-10-09
+- status: code and synthetic tests complete. Not checkpointed. No live call.
+- red: `tests/contract/test_anthropic_backend.py` failed collection because `AnthropicModelBackend` did not exist.
+- green: `./scripts/verify.sh` — 551 passed.
+- files: `src/promoter_ai_extraction/backends/anthropic_backend.py`, `src/promoter_ai_extraction/backends/__init__.py`, `src/promoter_ai_extraction/baseline.py`, `tests/contract/test_anthropic_backend.py`, `tests/integration/test_baseline_cli.py`, `pyproject.toml`, `uv.lock`, `02-DOCS/wiki/sdd/decisions.md`
+- decision: second adapter behind `ModelBackend`. Messages `output_config.format` json_schema. Model `claude-sonnet-5-5`. Default cap 4096 only for Anthropic. `max_retries=0`. No fallback. OpenAI stays the CLI default.
+- blocker: a real Anthropic call is not authorized.
+- note: `runs/t042-real-01` was not modified. No T043. No commit.
+

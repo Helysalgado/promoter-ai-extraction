@@ -341,6 +341,7 @@ def test_module_help_exits_zero() -> None:
     assert "--predictions" in completed.stdout
     assert "--report" in completed.stdout
     assert "--max-output-tokens" in completed.stdout
+    assert "--provider" in completed.stdout
 
 
 def test_cli_forwards_output_cap_to_backend(
@@ -415,6 +416,186 @@ def test_cli_rejects_non_positive_output_cap(tmp_path: Path) -> None:
     assert not report.is_file()
     assert "sk-" not in completed.stdout
     assert "sk-" not in completed.stderr
+
+
+def test_cli_default_provider_stays_openai(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: dict[str, object] = {}
+
+    class _CaptureBackend:
+        def __init__(self, **kwargs: object) -> None:
+            seen["constructed"] = True
+            seen.update(kwargs)
+
+        def generate(self, safe_input: SafeExtractionInput) -> BackendFailure:
+            return BackendFailure(code="STOPPED", message="default-provider test")
+
+        def reproducibility_metadata(self) -> dict[str, object]:
+            return {"common": {}, "by_property": {}}
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-not-a-real-key-do-not-leak")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(
+        "promoter_ai_extraction.baseline.OpenAIModelBackend",
+        _CaptureBackend,
+    )
+    monkeypatch.setattr(
+        "promoter_ai_extraction.baseline.AnthropicModelBackend",
+        lambda **kwargs: pytest.fail("default provider must stay OpenAI"),
+    )
+    manifest, documents, gold, predictions, report = _write_layout(tmp_path)
+    main(
+        [
+            "--manifest",
+            str(manifest),
+            "--documents",
+            str(documents),
+            "--gold",
+            str(gold),
+            "--predictions",
+            str(predictions),
+            "--report",
+            str(report),
+        ]
+    )
+    assert seen["constructed"] is True
+    assert seen["max_output_tokens"] == 128_000
+
+
+def test_cli_selects_anthropic_and_its_output_cap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: dict[str, object] = {}
+
+    class _CaptureBackend:
+        def __init__(self, **kwargs: object) -> None:
+            seen.update(kwargs)
+
+        def generate(self, safe_input: SafeExtractionInput) -> BackendFailure:
+            return BackendFailure(code="STOPPED", message="anthropic-provider test")
+
+        def reproducibility_metadata(self) -> dict[str, object]:
+            return {
+                "common": {
+                    "provider": "anthropic",
+                    "model": "claude-sonnet-5-5",
+                    "generation": {"max_tokens": seen["max_output_tokens"], "max_retries": 0},
+                },
+                "by_property": {},
+            }
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-not-a-real-key-do-not-leak")
+    monkeypatch.setattr(
+        "promoter_ai_extraction.baseline.AnthropicModelBackend",
+        _CaptureBackend,
+    )
+    monkeypatch.setattr(
+        "promoter_ai_extraction.baseline.OpenAIModelBackend",
+        lambda **kwargs: pytest.fail("anthropic must not fall back to OpenAI"),
+    )
+    manifest, documents, gold, predictions, report = _write_layout(tmp_path)
+    code = main(
+        [
+            "--manifest",
+            str(manifest),
+            "--documents",
+            str(documents),
+            "--gold",
+            str(gold),
+            "--predictions",
+            str(predictions),
+            "--report",
+            str(report),
+            "--provider",
+            "anthropic",
+            "--max-output-tokens",
+            "4096",
+        ]
+    )
+    assert seen["max_output_tokens"] == 4096
+    assert code in (0, 1)
+    payload = json.loads(report.read_text(encoding="utf-8"))
+    versions = json.dumps(payload.get("model_versions", payload))
+    assert "anthropic" in versions
+    assert "claude-sonnet-5-5" in versions
+    assert "sk-ant" not in versions
+    assert "sk-ant" not in report.read_text(encoding="utf-8")
+
+
+def test_cli_anthropic_omitted_cap_defaults_to_4096(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: dict[str, object] = {}
+
+    class _CaptureBackend:
+        def __init__(self, **kwargs: object) -> None:
+            seen.update(kwargs)
+
+        def generate(self, safe_input: SafeExtractionInput) -> BackendFailure:
+            return BackendFailure(code="STOPPED", message="anthropic-default-cap")
+
+        def reproducibility_metadata(self) -> dict[str, object]:
+            return {"common": {"provider": "anthropic"}, "by_property": {}}
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-not-a-real-key-do-not-leak")
+    monkeypatch.setattr(
+        "promoter_ai_extraction.baseline.AnthropicModelBackend",
+        _CaptureBackend,
+    )
+    manifest, documents, gold, predictions, report = _write_layout(tmp_path)
+    main(
+        [
+            "--manifest",
+            str(manifest),
+            "--documents",
+            str(documents),
+            "--gold",
+            str(gold),
+            "--predictions",
+            str(predictions),
+            "--report",
+            str(report),
+            "--provider",
+            "anthropic",
+        ]
+    )
+    assert seen["max_output_tokens"] == 4096
+
+
+def test_cli_anthropic_without_key_does_not_use_openai(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-not-a-real-key-do-not-leak")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(
+        "promoter_ai_extraction.baseline.OpenAIModelBackend",
+        lambda **kwargs: pytest.fail("a missing Anthropic key must not fall back to OpenAI"),
+    )
+    manifest, documents, gold, predictions, report = _write_layout(tmp_path)
+    code = main(
+        [
+            "--manifest",
+            str(manifest),
+            "--documents",
+            str(documents),
+            "--gold",
+            str(gold),
+            "--predictions",
+            str(predictions),
+            "--report",
+            str(report),
+            "--provider",
+            "anthropic",
+        ]
+    )
+    captured = capsys.readouterr()
+    assert code != 0
+    assert "ANTHROPIC_API_KEY" in captured.err
+    assert "sk-" not in captured.err
+    assert not report.is_file()
 
 
 def test_module_missing_args_exits_nonzero() -> None:

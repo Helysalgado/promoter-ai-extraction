@@ -14,7 +14,8 @@ from pathlib import Path
 
 from promoter_ai_extraction import __version__
 from promoter_ai_extraction.application import GuidedBaselineApplication
-from promoter_ai_extraction.backends import OpenAIModelBackend
+from promoter_ai_extraction.backends import AnthropicModelBackend, OpenAIModelBackend
+from promoter_ai_extraction.backends.anthropic_backend import DEFAULT_MAX_TOKENS
 from promoter_ai_extraction.backends.openai_backend import MAX_OUTPUT_TOKENS
 from promoter_ai_extraction.boundary import BoundaryViolation, DevelopmentCase
 from promoter_ai_extraction.documents import DocumentSource
@@ -116,24 +117,26 @@ def main(
     parser.add_argument("--predictions", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument(
+        "--provider",
+        choices=("openai", "anthropic"),
+        default="openai",
+        help="Model provider. Default: openai.",
+    )
+    parser.add_argument(
         "--max-output-tokens",
         type=_positive_output_tokens,
-        default=MAX_OUTPUT_TOKENS,
+        default=None,
         help=(
             "Positive output-token cap for each property call. "
-            f"Default: {MAX_OUTPUT_TOKENS}."
+            f"Default: {MAX_OUTPUT_TOKENS} for openai, {DEFAULT_MAX_TOKENS} for anthropic."
         ),
     )
     args = parser.parse_args(argv)
 
     if backend is None:
-        secret = (os.environ.get("OPENAI_API_KEY") or "").strip()
-        if not secret:
-            print("MISSING_CREDENTIAL: OPENAI_API_KEY is not set.", file=sys.stderr)
+        active: ModelBackend | None = _backend_from_args(args)
+        if active is None:
             return 1
-        active: ModelBackend = OpenAIModelBackend(
-            max_output_tokens=args.max_output_tokens
-        )
     else:
         active = backend
     try:
@@ -151,6 +154,23 @@ def main(
         return 0
     print(_failure_message(outcome), file=sys.stderr)
     return 1
+
+
+def _backend_from_args(args: argparse.Namespace) -> ModelBackend | None:
+    """Construct the selected provider. OpenAI stays the default. No fallback."""
+    if args.provider == "anthropic":
+        secret = (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
+        if not secret:
+            print("MISSING_CREDENTIAL: ANTHROPIC_API_KEY is not set.", file=sys.stderr)
+            return None
+        cap = DEFAULT_MAX_TOKENS if args.max_output_tokens is None else args.max_output_tokens
+        return AnthropicModelBackend(max_output_tokens=cap)
+    secret = (os.environ.get("OPENAI_API_KEY") or "").strip()
+    if not secret:
+        print("MISSING_CREDENTIAL: OPENAI_API_KEY is not set.", file=sys.stderr)
+        return None
+    cap = MAX_OUTPUT_TOKENS if args.max_output_tokens is None else args.max_output_tokens
+    return OpenAIModelBackend(max_output_tokens=cap)
 
 
 def _positive_output_tokens(raw: str) -> int:
