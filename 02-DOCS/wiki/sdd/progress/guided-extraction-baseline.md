@@ -482,3 +482,126 @@ slug: guided-extraction-baseline
 - blocker: a real Anthropic call is not authorized.
 - note: `runs/t042-real-01` was not modified. No T043. No commit.
 
+## T042 — 2026-10-09 (controlled real runs; documentary close)
+
+- status: complete for the controlled-execution done-check. This records that the baseline ran on one real local case and wrote a report. It does not record scientific performance on the workset.
+- evidence: gitignored `runs/t042-real-01` and `runs/t042-real-02`. This close did not re-execute either run and did not rewrite the prediction or the report. No gold value, document excerpt, or absolute private path is copied here.
+- functioning — OpenAI `t042-real-01`: provider `openai`, model `gpt-6.1-sol`, `max_output_tokens` 4096, `max_retries` 0. Four property slots are `technical_failure` / `PROVIDER_ERROR`. Each persisted message identifies `RateLimitError` and does not store an HTTP status. There is no scientific extraction. Report: `evaluated_rows` 0, `technical_failures` 3, `technical_failure_rate` 1.0, `scientific_abstentions` 0, `coverage` 0.0, end-to-end TP 0, FP 0, FN 3. The report counts three technical failures because factor sigma has `n_targets` 0. Parser `current-workset-v1`. Prompt `safe-extraction-v1`.
+- functioning — Anthropic `t042-real-02`: provider `anthropic`, model `claude-sonnet-5-5`, API `messages`, `max_output_tokens` 4096, `max_retries` 0. One case: paper `10400579`, promoter `yicRp`, `run_id` `10400579__yicRp`. Four scientific outcomes and no technical failure: TSS `EXTRACTED`, Caja -10 `AMBIGUOUS`, Caja -35 `NOT_FOUND`, factor sigma `NOT_FOUND`. Report: `evaluated_rows` 3, `technical_failures` 0, `technical_failure_rate` 0.0, `scientific_abstentions` 2, `parse_failures` 0, `coverage` 1.0. Headline `end_to_end`. Parser `current-workset-v1`. Schema `raw-property-payload-v1`. Per-property counts are present. The scientific view includes `recall_texto_explicito` and `recall_imagen_only`. `limitation_note` is present.
+- scientific performance — not claimed. Historical totals on `t042-real-02` are TP 0, FP 1, FN 3, `n_targets` 3, in both views. TSS is the FP: `value_normalized` stayed a non-integer documentary expression, equal to `value_raw`, with a null derivation note. Caja -10 and Caja -35 are the two scientific abstentions and the other two FN. Factor sigma has `n_targets` 0. These counts describe one development case. They are not a workset score.
+- later normalizer: `8ceb02e` teaches the TSS normalizer to read one explicit anchored distance. That commit did not change `t042-real-02`. The historical mismatch stands. Syntactic normalization of an anchored distance does not by itself prove that the distance is the TSS rather than another regulatory feature.
+- done-check: `t042-real-02` is the controlled execution. Its report has per-property metrics, modality strata, coverage, failures, and parser/model versions. `runs/` is ignored. This close does not stage predictions, reports, the workbook, or the case manifest.
+- acceptance trace for this case, not a new test: AC-19 and AC-20 hold because the prediction file exists and the report scores that persisted run without altering it. AC-21–AC-24 are visible in the report. AC-25 is not claimed: one case does not assign the workset to development and test. AC-26 holds because the limitation note is present and this close does not claim a false-assertion rate or abstention appropriateness for the 329-row subset.
+- blocker: none for T042. T043 and T044 are not started.
+- files: `02-DOCS/wiki/sdd/progress/guided-extraction-baseline.md`, `02-DOCS/wiki/sdd/decisions.md`
+- note: no code, no tests, no root-contract edit, no API call, no rescore. Prior T042 entries above remain the record of what was true when they were written.
+
+## T043 — 2026-10-09 (deterministic suite and scope audit)
+
+- status: complete. The done-check passes. This audit does not start T044 and does not add FastAPI, RAG, agents, or deployment.
+- green: `./scripts/verify.sh` exited 0. Pytest: 561 passed in 3.01s. The gate also confirmed `data/`, `02-DOCS/data/`, `02-DOCS/data/SUBSET_GOLD.xlsx`, and `02-DOCS/data/safe-development-manifest.json` are git-ignored, and `tests/fixtures/synthetic_gold.xlsx` plus `tests/fixtures/synthetic_safe_manifest.json` are not.
+- scope: runtime dependencies in `pyproject.toml` are `openpyxl`, `defusedxml`, `openai`, and `anthropic`. The dev group is `pytest`. `uv.lock` adds only their transitive packages (`pydantic`, `httpx2`, `httpcore2`, and the rest of those SDK stacks). No FastAPI, LangChain, LiteLLM, vector client, database driver, frontend, or deployment manifest. `src/` imports those four libraries plus the standard library. `openai` and `anthropic` are imported inside the live-client constructors, not at module import. No Dockerfile or service manifest.
+- privacy: `git ls-files` has no `.env`, no `SUBSET_GOLD.xlsx`, no `runs/`, and no real TEI/TXT. `.env`, `runs/t042-real-01`, and `runs/t042-real-02` are ignored. The only tracked dotenv path is `01-TOOLS/_TEMPLATE/.env.example`. Run artifact mtimes are unchanged: `1791592748` and `1791603651`.
+- leakage: `GoldLoader` is imported by the evaluation service, not by extraction or the backends. `boundary.py` still rejects forbidden field names before the allowlist, including nested keys. The six root contracts have no diff against `8ceb02e`. Tests use synthetic fixtures. The string `SUBSET_GOLD` in the Anthropic contract test is a denylist sentinel, not the workbook. The Anthropic client in that test is monkeypatched.
+- AC-01–AC-33: the plan assigns these to the deterministic suite and this dependency inspection. The suite passed and the inspection found no out-of-scope dependency. AC-27 holds for this slice.
+- blocker: none.
+- files: `02-DOCS/wiki/sdd/progress/guided-extraction-baseline.md`
+- note: no code, dependency, contract, or prediction edit. No provider call. T044 is not started.
+
+## T044 — 2026-10-09 (evidence map and baseline documentary close)
+
+- status: complete. `guided-extraction-baseline` T001–T044 meet their recorded done-checks. This section is the map. It does not replace the entries above and does not copy a private value, credential, absolute path, prediction, or gold cell.
+- done-check: each task below points at the command or result already written in its section. T042's controlled local evidence stays in `T042 — 2026-10-09 (controlled real runs; documentary close)`.
+- suite reading: T043 records `./scripts/verify.sh` with 561 passed. That is one synthetic, contract, and integration run. It is not 561 papers and not 561 independent scientific cases.
+
+### Evidence classes
+
+- Deterministic: T001–T041, the synthetic portions of T042, and T043. Inputs are `tests/fixtures/` or `tmp_path`. No live provider call is part of that evidence.
+- Real functioning: gitignored `runs/t042-real-02`. One case. Claude `claude-sonnet-5-5`. A report was written. Counts stay in the T042 close section and are not a workset score.
+- Technical failure: gitignored `runs/t042-real-01`. Four property slots are `PROVIDER_ERROR` / `RateLimitError`. No scientific extraction. The report's `technical_failures` count is 3 because factor sigma has `n_targets` 0.
+- Scientific limitation: the stored Anthropic totals are not corpus performance. The TSS normalized value in that artifact remained a documentary expression. `8ceb02e` did not rewrite it. An anchored distance the normalizer can parse is not, by that parse alone, proof that the distance is the TSS.
+
+### Task map
+
+| ID | Final status | Checkable result |
+|---|---|---|
+| T001 | complete | Real workbook path ignored; `tests/fixtures/synthetic_gold.xlsx` not ignored. |
+| T002 | complete | `./scripts/verify.sh` exits 0 after package setup. |
+| T003 | complete | Domain-model tests pass after T004. |
+| T004 | complete | `tests/unit/test_models.py`: four properties, five scientific statuses, technical-failure separation. |
+| T005 | complete | TXT suite passes after T006. |
+| T006 | complete | `tests/unit/test_txt_loader.py`. |
+| T007 | complete | TEI suite passes after T008. |
+| T008 | complete | `tests/unit/test_tei_loader.py`, `defusedxml`. |
+| T009 | complete | Boundary RED cases pass after T010. |
+| T010 | complete | `tests/unit/test_boundary.py`: allowlist, denylist, no gold path on the request. |
+| T011 | complete | 52 normalization tests pass after T012. |
+| T012 | complete | `tests/unit/test_normalization.py`. |
+| T013 | complete | 19 validator tests pass after T014. |
+| T014 | complete | `tests/unit/test_validation.py`. |
+| T015 | complete | 17 extractor-port contract tests pass after T016. |
+| T016 | complete | `tests/contract/test_extractor_port.py`. `SafeExtractionInput` has no gold fields. |
+| T017 | complete | `tests/unit/test_extraction_service.py`, 16 tests. No observed RED: the service already existed from T016. |
+| T018 | complete | Same service. Four slots. One slot's failure does not change the others. |
+| T019 | complete | Schema version 1 round-trip. |
+| T020 | complete | `tests/unit/test_prediction_schema.py`. |
+| T021 | complete | Atomic write, no overwrite, hash check. |
+| T022 | complete | `tests/unit/test_prediction_store.py`. |
+| T023 | complete | Gold loader waits for a verified persisted prediction. |
+| T024 | complete | `tests/unit/evaluation/test_gold_loader.py`. |
+| T025 | complete | Parser cases, including Caja -10 ` + ` and fail-closed unknown syntax. |
+| T026 | complete | `tests/unit/evaluation/test_gold_parser.py`. |
+| T027 | complete | 14 comparison tests pass after T028. |
+| T028 | complete | `tests/unit/evaluation/test_comparison.py`. |
+| T029 | complete | 8 metrics and split tests pass after T030. |
+| T030 | complete | `tests/unit/evaluation/test_metrics.py`. Synthetic paper-grouped split. Positive-only limitation text. |
+| T031 | complete | First entry was blocked. Authority is `T031 — 2026-10-07 (resolved)` plus the 2026-10-09 multi-value clarification in `decisions.md`. |
+| T032 | complete | In-memory runs record zero gold-loader calls. |
+| T033 | complete | `tests/contract/test_leakage_ordering.py` and `tests/contract/test_gold_boundary.py`. |
+| T034 | complete | Synthetic TXT and TEI flows pass after T035. |
+| T035 | complete | `tests/integration/test_guided_baseline.py`. |
+| T036 | complete | Decision: OpenAI Responses API, `gpt-6.1-sol`. |
+| T037 | complete | `tests/contract/test_real_backend_adapter.py` with a fake client. No network. |
+| T038 | complete | OpenAI adapter. Review follow-up: 46 passed in the focused contract files; `./scripts/verify.sh` 471 passed. |
+| T039 | complete | `tests/unit/test_development_manifest.py`. Real manifest path stays ignored. |
+| T040 | complete as RED | Green is T041, by the task split. |
+| T041 | complete | `tests/integration/test_baseline_runner.py`, 7 passed; later review follow-up 30 passed. |
+| T042 | complete for the controlled run | Synthetic CLI evidence is in the earlier T042 sections (`tests/integration/test_baseline_cli.py`, `tests/unit/evaluation/test_dual_view.py`). Live evidence is only the T042 close section. |
+| T043 | complete | `./scripts/verify.sh`, 561 passed. No FastAPI, RAG, agent, frontend, deployment, vector, or database dependency. |
+
+### Acceptance map
+
+Grouped coverage is the plan table "Acceptance-criterion coverage". These files exist and match those groups. This map does not assign one test function to each AC.
+
+| Criteria | Tasks | Existing tests |
+|---|---|---|
+| AC-01–AC-03 | T005–T008 | `tests/unit/test_txt_loader.py`, `tests/unit/test_tei_loader.py` |
+| AC-04, AC-09 | T016–T018 | `tests/unit/test_extraction_service.py`, `tests/contract/test_extractor_port.py` |
+| AC-05, AC-10 | T016 | `tests/contract/test_extractor_port.py` |
+| AC-06–AC-08 | T011–T012 | `tests/unit/test_normalization.py` |
+| AC-11–AC-16 | T006–T018 | Loader, extraction, and port tests above |
+| AC-17–AC-18 | T013–T014 | `tests/unit/test_validation.py` |
+| AC-19–AC-20 | T023–T033 | `tests/contract/test_leakage_ordering.py`, `tests/contract/test_gold_boundary.py` |
+| AC-21–AC-26 | T027–T031, T042 | `tests/unit/evaluation/test_comparison.py`, `tests/unit/evaluation/test_metrics.py`, `tests/unit/evaluation/test_dual_view.py` |
+| AC-27 | T002, T043 | `pyproject.toml`, `uv.lock`, T043 scope notes |
+| AC-28–AC-30 | T009–T014, T037–T038 | `tests/unit/test_boundary.py`, `tests/unit/test_models.py`, both backend contract tests |
+| AC-31–AC-33 | T025–T026 | `tests/unit/evaluation/test_gold_parser.py` |
+
+AC-25 is covered by the synthetic split validator in `tests/unit/evaluation/test_metrics.py`. The one real case does not assign the workset to development and test. AC-26 is the limitation note. Neither AC is a corpus-performance claim.
+
+### Traceability gaps
+
+- There is no file that pairs each of AC-01–AC-33 with one test function. The plan groups them.
+- T017 did not show a failing test first.
+- The cost-control progress entry does not record a pytest count. Later checkable counts are 551 after the Anthropic adapter and 561 at T043.
+- Entries written before the live runs still say the live done-check was not started. The T042 close section is the authority for that done-check.
+- Constitution Definition of Done also asks for a branch and a pull request. That merge is not T044. This close does not open one.
+
+### Outside this baseline
+
+FastAPI, RAG, agents, and a demonstration stay in the plan section "Post-baseline course milestones". They are not tasks T001–T044 and this map does not start them.
+
+- blocker: none.
+- files: `02-DOCS/wiki/sdd/progress/guided-extraction-baseline.md`, `02-DOCS/wiki/sdd/decisions.md`
+- note: no code, test, dependency, root-contract, or prediction edit. No provider call. `t042-real-02` metrics were not restated as a new measurement.
+

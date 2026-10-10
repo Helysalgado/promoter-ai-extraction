@@ -293,3 +293,29 @@ Decision: `AnthropicModelBackend` implements `ModelBackend`. `PropertyExtractor`
 Why: one extraction contract, two providers, and the OpenAI baseline command stays the same when the new flag is omitted.
 
 Status: local. Not checkpointed. No live Anthropic or OpenAI call.
+
+## 2026-10-09 — T042 closed on the existing real runs
+
+Context: the controlled-execution done-check is a local command that exits with a report of per-property metrics, strata, coverage, failures, and parser/model versions, without staging private or generated files. Two runs already exist under gitignored `runs/`. The entries above recorded the adapter and the cap before those runs and before commits `30dd9cd` and `8ceb02e`. This entry does not rewrite them.
+
+Options: call a provider again; rescore the persisted Anthropic prediction with the later TSS normalizer; accept the stored artifacts as the T042 record.
+
+Decision: accept the stored artifacts. `runs/t042-real-02` is the controlled execution (Anthropic `claude-sonnet-5-5`, one case, paper `10400579`, promoter `yicRp`). `runs/t042-real-01` is an OpenAI provider failure (`PROVIDER_ERROR` / `RateLimitError` on four property slots), not a scientific result and not a model comparison. Neither artifact is rewritten. No gold value is copied into this log.
+
+The historical Anthropic report is functioning evidence. Its TP 0, FP 1, FN 3 totals are not a workset performance claim. The TSS slot remained a documentary expression. `8ceb02e` does not apply retroactively. An anchored distance that the normalizer can parse is still not, by that parse alone, proof that the distance is the TSS.
+
+Why: the done-check asks for a completed controlled run and a report. It does not ask for a higher score, a second call, or the 329-row subset.
+
+Status: T042 documentary close. T043 and T044 are not started. No root-contract edit.
+
+## 2026-10-09 — Baseline evidence map closed
+
+Context: T044 asks the progress artifact to map T001–T043 to recorded commands and results, and to keep the controlled T042 evidence separate. T042 and T043 were already recorded. The plan lists FastAPI, RAG, agents, and a demonstration as post-baseline milestones.
+
+Options: rewrite the task entries into one narrative; add a second evidence document; append the map to the progress artifact and leave the entries in place.
+
+Decision: append the map as `T044 — 2026-10-09 (evidence map and baseline documentary close)`. Earlier entries stay as written. `guided-extraction-baseline` is documentary-complete for T001–T044. The 561-test run is synthetic and contract evidence, not a corpus score. `runs/t042-real-02` stays the one-case functioning record, with its historical metrics unchanged. FastAPI, RAG, agents, and a demonstration are not part of this close.
+
+Why: the done-check is a map inside the existing progress artifact. A second write-up would duplicate it. Folding the milestones into this baseline would contradict the plan's explicit exclusion.
+
+Status: T044 closed. No root-contract edit. No merge and no pull request in this step.
