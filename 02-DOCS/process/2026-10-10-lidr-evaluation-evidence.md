@@ -70,3 +70,7 @@ Aquí «recuperación» del contrato es recuperar valores gold, no acertar segme
 ## Tamaño de muestra
 
 No hay evaluación completa del corpus ni del subconjunto de trabajo. Hay un caso real de baseline y un documento sintético de agente. La prueba de interfaz usa ese mismo tipo de documento y no aumenta la muestra. La suite de 616 no aumenta ese tamaño.
+
+## Conteo posterior
+
+El 616 de arriba es el conteo registrado en esta nota, con HEAD `2c42d62`. No es el conteo de la rama después de la consulta de predicciones. En `30b8489`, `./scripts/verify.sh` pasó 639 pruebas. Siguen siendo pruebas de software. No son un score de corpus.

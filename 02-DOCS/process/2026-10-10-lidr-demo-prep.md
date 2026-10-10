@@ -58,7 +58,7 @@ TSS quedó en `INVALID_BACKEND_PAYLOAD` porque los identificadores de evidencia 
 
 ## Pruebas
 
-`./scripts/verify.sh` no llama a un proveedor. La compuerta de este HEAD pasó 639 pruebas. En el video, esas 639 son pruebas del software. El README todavía cita 616 en un párrafo histórico: no leas ese número. Tampoco leas la frase antigua que dice que la rama no incluye interfaz.
+`./scripts/verify.sh` no llama a un proveedor. En el video, di que las pruebas de `./scripts/verify.sh` son pruebas del software. No son un score del corpus. No cites un número viejo de una nota de proceso como si fuera la medición científica.
 
 ## Al terminar
 
