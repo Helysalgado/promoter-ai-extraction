@@ -12,6 +12,7 @@
 | LIDR live UI verification (synthetic, recorded) | `02-DOCS/process/2026-10-10-lidr-live-ui-verification.md` |
 | LIDR evaluation evidence (not a corpus score) | `02-DOCS/process/2026-10-10-lidr-evaluation-evidence.md` |
 | Architecture and scientific workflow | `02-DOCS/architecture-and-scientific-workflow.md` |
+| Future work roadmap (proposal, not implemented) | [`../future-work.md`](../future-work.md) |
 | Project README | `README.md` |
 | Guided extraction baseline implementation progress | `02-DOCS/wiki/sdd/progress/guided-extraction-baseline.md` |
 | Harness profile | `02-DOCS/wiki/harness/user-profile.md` |

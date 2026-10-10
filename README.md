@@ -128,11 +128,18 @@ Normalizing an anchored distance does not prove that the distance is the TSS. Th
 
 The recorded boundary is [`02-DOCS/process/2026-10-10-lidr-evaluation-evidence.md`](02-DOCS/process/2026-10-10-lidr-evaluation-evidence.md).
 
+## Future work
+
+This is a proposal for how the system could evolve. It is not a list of implemented features. The roadmap starts with a bounded TSS normalization fix, then batch processing, then a systematic gold evaluation after predictions are stored. Later increments stay in the proposal until each one is specified and approved.
+
+[`02-DOCS/future-work.md`](02-DOCS/future-work.md)
+
 ## Documentation
 
 | Read | Path |
 |---|---|
 | Architecture and scientific workflow | [`02-DOCS/architecture-and-scientific-workflow.md`](02-DOCS/architecture-and-scientific-workflow.md) |
+| Future work (proposal, not implemented) | [`02-DOCS/future-work.md`](02-DOCS/future-work.md) |
 | Knowledge map | [`02-DOCS/wiki/index.md`](02-DOCS/wiki/index.md) |
 | Constitution | [`02-DOCS/wiki/sdd/constitution.md`](02-DOCS/wiki/sdd/constitution.md) |
 | Project definition | [`project-overview.md`](project-overview.md) |
