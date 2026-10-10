@@ -15,9 +15,24 @@ wheels/
 # Local environment
 .env
 
-# Local/private datasets
-data/raw/
-data/private/
+# Local real papers, gold copies, and derived processing outputs.
+# Root-only directory ignore: covers data/gold-pmid-tei-txt/ and every other
+# file under data/. Do not use *.txt / *.xml / *.xlsx — synthetic fixtures
+# under tests/fixtures/ and tmp_path must remain versionable.
+/data/
+
+# Same policy at the current on-disk location of the subset (constitution
+# principle 9). Root-only so this does not match a tests/.../02-DOCS/data/ path.
+/02-DOCS/data/
+
+# Real gold workbook — redundant with /02-DOCS/data/, kept as an explicit
+# exact rule so the historical evaluator path stays named in this file.
+02-DOCS/data/SUBSET_GOLD.xlsx
+
+# Local generated prediction/output directories (constitution principle 9; T001)
+predictions/
+outputs/
+runs/
 
 # rsc local state (hooks, seals, logs) and managed skill links — machine-local
 .rsc/
@@ -74,3 +89,7 @@ data/private/
 .cursor/commands/specify.md
 .cursor/commands/tasks.md
 .cursor/commands/verify.md
+
+# rsc local state (hooks, seals, logs) and managed skill links — machine-local
+.cursor/rules/testing-py.mdc
+.cursor/commands/test-coverage.md

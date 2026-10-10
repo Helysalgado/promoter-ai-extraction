@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# verify.sh — deterministic quality gate for promoter-ai-extraction.
+# Runs the test suite; exits non-zero on any failure.
+# Approved tools for this increment: pytest (ruff/mypy deferred to a later increment).
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+
+echo "=== promoter-ai-extraction — verify gate ==="
+echo "Working directory: $REPO_ROOT"
+
+# Safety: refuse to version real papers, gold, or derived local data/.
+if git check-ignore -q "data/" 2>/dev/null \
+    && git check-ignore -q "02-DOCS/data/" 2>/dev/null \
+    && git check-ignore -q "02-DOCS/data/SUBSET_GOLD.xlsx" 2>/dev/null; then
+    echo "[ok] Root data/, 02-DOCS/data/, and the real gold workbook are git-ignored."
+else
+    echo "[WARN] Local data/ or the real gold workbook is NOT git-ignored — check .gitignore."
+fi
+
+# Integrity: synthetic fixtures must remain versionable.
+# If the .gitignore has been broadened (e.g. to *.xlsx) it would accidentally
+# exclude synthetic test fixtures — detect and fail fast.
+if git check-ignore -q "tests/fixtures/synthetic_gold.xlsx" 2>/dev/null \
+    || git check-ignore -q "tests/fixtures/synthetic_safe_manifest.json" 2>/dev/null; then
+    echo "[FAIL] a synthetic fixture under tests/fixtures/ is git-ignored."
+    echo "       Synthetic fixtures must be versionable. Do not broaden .gitignore"
+    echo "       to match all XLSX/XML/TXT/JSON files. Check .gitignore (T001/T039)."
+    exit 1
+else
+    echo "[ok] Synthetic fixture paths are versionable (not git-ignored)."
+fi
+
+if git check-ignore -q "02-DOCS/data/safe-development-manifest.json" 2>/dev/null; then
+    echo "[ok] Real development manifest path is git-ignored."
+else
+    echo "[FAIL] 02-DOCS/data/safe-development-manifest.json is not git-ignored."
+    exit 1
+fi
+
+echo ""
+echo "--- pytest ---"
+uv run pytest -q "$@"
+
+echo ""
+echo "=== verify gate passed ==="

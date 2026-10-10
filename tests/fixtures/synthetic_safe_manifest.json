@@ -1,0 +1,12 @@
+{
+  "cases": [
+    {
+      "document_path": "papers/PMC12345.txt",
+      "document_format": "TXT",
+      "paper_id": "PMC12345",
+      "promoter_id": null,
+      "promoter_name": "lacZp1",
+      "paper_gene_synonym": null
+    }
+  ]
+}
