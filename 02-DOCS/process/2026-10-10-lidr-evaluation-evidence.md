@@ -18,7 +18,7 @@ status: recorded
 
 Las pruebas sintéticas demuestran contratos y regresión. No validan el corpus.
 
-## Cinco evidencias distintas
+## Seis evidencias distintas
 
 | Evidencia | Entrada | Qué afirma | Qué no afirma |
 |---|---|---|---|
@@ -27,6 +27,7 @@ Las pruebas sintéticas demuestran contratos y regresión. No validan el corpus.
 | Baseline real con OpenAI | El mismo control, otra corrida | Fallo técnico de proveedor en los cuatro slots. | Una extracción científica. |
 | RAG con FastEmbed | El `POST /agent/extract` sintético | El modelo local `BAAI/bge-small-en-v1.5` recuperó segmentos. | Calidad de recuperación contra evidencia anotada. |
 | Agente real | Un documento sintético, Anthropic | Un ciclo `retrieve_evidence` → `tool_result` → `extract_property` quedó persistido. | Las cuatro propiedades correctas, ni un corpus. |
+| Interfaz real | El mismo tipo de documento sintético, desde Chrome | La página envió una petición y pintó el JSON real, incluido un fallo técnico. | Calidad científica sobre un corpus. |
 
 ## Suite
 
@@ -50,6 +51,10 @@ La verificación real de FastEmbed es la del agente sintético, no una evaluaci�
 
 `POST /agent/extract`, documento sintético, HTTP 200 en 17.6 s, 3 rondas, 8 herramientas, terminación `end_turn`. Cuatro extracciones intentadas. Caja −10, caja −35 y factor sigma quedaron `EXTRACTED` y validadas. TSS no.
 
+## Interfaz real
+
+La verificación desde Chrome está en `02-DOCS/process/2026-10-10-lidr-live-ui-verification.md`. Comprueba la aplicación: una petición, persistencia y tarjetas alineadas con el JSON. No es una evaluación de corpus. El TSS repitió el fallo técnico ya registrado; no hubo segunda llamada.
+
 ## Métricas
 
 Métricas de extracción que el evaluador calcula, por propiedad: `precision`, `recall`, `f1`, `exact_row_accuracy`, `recall_texto_explicito`, `recall_imagen_only`. El reporte añade `coverage`, `technical_failure_rate`, abstenciones científicas y fallos técnicos. La vista principal es `end_to_end`. La definición vive en `evaluation-contract.md`.
@@ -64,4 +69,4 @@ Aquí «recuperación» del contrato es recuperar valores gold, no acertar segme
 
 ## Tamaño de muestra
 
-No hay evaluación completa del corpus ni del subconjunto de trabajo. Hay un caso real de baseline y un documento sintético de agente. La suite de 616 no aumenta ese tamaño.
+No hay evaluación completa del corpus ni del subconjunto de trabajo. Hay un caso real de baseline y un documento sintético de agente. La prueba de interfaz usa ese mismo tipo de documento y no aumenta la muestra. La suite de 616 no aumenta ese tamaño.
