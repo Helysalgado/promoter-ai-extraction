@@ -190,9 +190,12 @@ def test_loading_the_page_does_not_call_the_backend(
     assert backend.calls == 0
     script = _text("app.js")
     submit = _function_body(script, "submitExtraction")
-    assert script.count("fetch(") == 1
+    load = _function_body(script, "loadSaved")
+    assert script.count("fetch(") == 2
     assert "fetch(" in submit
-    assert "fetch(" not in script.replace(submit, "", 1)
+    assert 'fetch("/predictions/"' in load
+    rest = script.replace(submit, "", 1).replace(load, "", 1)
+    assert "fetch(" not in rest
 
 
 def test_form_contract_uses_only_allowed_request_fields() -> None:

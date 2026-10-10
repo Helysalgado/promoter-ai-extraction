@@ -41,7 +41,11 @@ from promoter_ai_extraction.models import (
     RejectedCandidate,
     TechnicalFailure,
 )
-from promoter_ai_extraction.persistence import PersistenceFailure, PredictionStore
+from promoter_ai_extraction.persistence import (
+    PersistenceFailure,
+    PredictionStore,
+    VerifiedPersistedPrediction,
+)
 from promoter_ai_extraction.retrieval import (
     Embedder,
     EmbedderUnavailable,
@@ -305,6 +309,17 @@ def create_app(
                 return _error(500, "WRITE_ERROR", "The prediction could not be stored.")
         return JSONResponse(status_code=200, content=_public_agent_run(run, agent=trace))
 
+    @app.get("/predictions/{run_id:path}")
+    def read_prediction(run_id: str, request: Request) -> JSONResponse:
+        """Return one saved prediction. This route does not extract."""
+        store: PredictionStore = request.app.state.store
+        loaded = store.read(run_id)
+        if isinstance(loaded, PersistenceFailure):
+            status = _READ_STATUS.get(loaded.code, 422)
+            message = _READ_MESSAGES.get(loaded.code, "The saved prediction could not be read.")
+            return _error(status, loaded.code, message)
+        return JSONResponse(status_code=200, content=_public_saved(loaded))
+
     ui_dir = Path(__file__).resolve().parent / "ui"
 
     @app.get("/", include_in_schema=False)
@@ -362,6 +377,44 @@ def _public_run(
             "Factor sigma": _public_attempt(run.sigma),
         },
     }
+
+
+_READ_STATUS = {
+    "FILE_NOT_FOUND": 404,
+    "LOAD_ERROR": 500,
+}
+_READ_MESSAGES = {
+    "FILE_NOT_FOUND": "No saved prediction exists for this identity.",
+    "INVALID_REQUEST": "The prediction identifier is not valid.",
+    "CORRUPT_RECORD": "The saved prediction could not be read.",
+    "UNSUPPORTED_SCHEMA": "The saved prediction uses an unsupported schema.",
+    "LOAD_ERROR": "The saved prediction could not be read from disk.",
+}
+
+
+def _public_saved(loaded: VerifiedPersistedPrediction) -> dict[str, object]:
+    """Card payload from a saved run. Paths and gold stay out."""
+    run = loaded.run
+    payload: dict[str, object] = {
+        "run_id": run.run_id,
+        "paper_id": run.paper_id,
+        "promoter_name": run.promoter_name,
+        "properties": {
+            "TSS": _public_attempt(run.tss),
+            "Caja -10": _public_attempt(run.caja_10),
+            "Caja -35": _public_attempt(run.caja_35),
+            "Factor sigma": _public_attempt(run.sigma),
+        },
+    }
+    fingerprint = loaded.system_fingerprint
+    if isinstance(fingerprint, dict):
+        agent = fingerprint.get("agent")
+        retrieval = fingerprint.get("retrieval")
+        if isinstance(agent, dict):
+            payload["agent"] = agent
+        if isinstance(retrieval, dict):
+            payload["retrieval"] = retrieval
+    return payload
 
 
 def _public_agent_run(run: ExtractionRun, *, agent: dict[str, object]) -> dict[str, object]:

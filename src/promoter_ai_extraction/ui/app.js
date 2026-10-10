@@ -100,8 +100,17 @@ function canSubmit() {
   return true;
 }
 
+function canLoad() {
+  if (state.sending) return false;
+  return Boolean(field("paper-id") && field("promoter-name"));
+}
+
 function refreshRunButton() {
   document.getElementById("run").disabled = !canSubmit();
+}
+
+function refreshLoadButton() {
+  document.getElementById("load-saved").disabled = !canLoad();
 }
 
 function syncProvider() {
@@ -321,11 +330,43 @@ function onFile() {
   reader.readAsText(file, "UTF-8");
 }
 
+async function loadSaved() {
+  if (!canLoad()) return;
+  state.sending = true;
+  refreshRunButton();
+  refreshLoadButton();
+  const runId = field("paper-id") + "__" + field("promoter-name");
+  try {
+    const response = await fetch("/predictions/" + encodeURIComponent(runId));
+    const body = await response.json();
+    if (!response.ok) {
+      showError(response.status, body);
+      return;
+    }
+    state.response = body;
+    state.persistedKey = identityKey();
+    document.getElementById("status").textContent = "Resultado previamente guardado";
+    renderCards();
+    renderDetail();
+    renderTrace(body);
+  } catch (error) {
+    showError(0, {
+      code: "CONNECTION_ERROR",
+      message: "No se pudo contactar el servidor local."
+    });
+  } finally {
+    state.sending = false;
+    refreshRunButton();
+    refreshLoadButton();
+  }
+}
+
 async function submitExtraction(event) {
   event.preventDefault();
   if (!canSubmit()) return;
   state.sending = true;
   refreshRunButton();
+  refreshLoadButton();
   try {
     const response = await fetch(endpoint(), {
       method: "POST",
@@ -352,20 +393,28 @@ async function submitExtraction(event) {
   } finally {
     state.sending = false;
     refreshRunButton();
+    refreshLoadButton();
   }
 }
 
 document.addEventListener("DOMContentLoaded", function () {
   document.getElementById("article").addEventListener("change", onFile);
   document.getElementById("extract-form").addEventListener("submit", submitExtraction);
+  document.getElementById("load-saved").addEventListener("click", loadSaved);
   const methods = document.querySelectorAll('input[name="method"]');
   for (let index = 0; index < methods.length; index += 1) {
     methods[index].addEventListener("change", syncProvider);
   }
   document.getElementById("provider").addEventListener("change", refreshRunButton);
   document.getElementById("confirm-call").addEventListener("change", refreshRunButton);
-  document.getElementById("paper-id").addEventListener("input", refreshRunButton);
-  document.getElementById("promoter-name").addEventListener("input", refreshRunButton);
+  document.getElementById("paper-id").addEventListener("input", function () {
+    refreshRunButton();
+    refreshLoadButton();
+  });
+  document.getElementById("promoter-name").addEventListener("input", function () {
+    refreshRunButton();
+    refreshLoadButton();
+  });
   const cards = document.querySelectorAll("[data-property]");
   for (let index = 0; index < cards.length; index += 1) {
     cards[index].addEventListener("click", function () {
@@ -374,4 +423,5 @@ document.addEventListener("DOMContentLoaded", function () {
   }
   syncProvider();
   refreshRunButton();
+  refreshLoadButton();
 });

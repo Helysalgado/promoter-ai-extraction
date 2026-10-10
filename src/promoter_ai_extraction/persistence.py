@@ -382,6 +382,14 @@ def _sha256_of(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
+def _run_id_is_safe(run_id: str) -> bool:
+    """Reject an identifier that could address a path outside the store."""
+    if not isinstance(run_id, str) or not run_id or run_id != run_id.strip():
+        return False
+    forbidden = ("/", "\\", ":", "..", "\x00")
+    return not any(token in run_id for token in forbidden)
+
+
 class PredictionStore:
     """Write-once atomic local JSON prediction store.
 
@@ -413,6 +421,101 @@ class PredictionStore:
     def exists(self, run_id: str) -> bool:
         """Return whether a prediction file for *run_id* is already stored."""
         return self._target_path(run_id).is_file()
+
+    def read(self, run_id: str) -> VerifiedPersistedPrediction | PersistenceFailure:
+        """Load one prediction by ``run_id`` without writing the file.
+
+        The identifier is a single name. Slashes, backslashes, colons, and
+        ``..`` are rejected. A symlink is read only when its target stays
+        inside this store directory.
+        """
+        if not _run_id_is_safe(run_id):
+            return PersistenceFailure(
+                stage="load",
+                code="INVALID_REQUEST",
+                message="The prediction identifier is not valid.",
+                cause="InvalidRunId",
+            )
+        target = self._target_path(run_id)
+        root = self._store_dir.resolve()
+        try:
+            resolved = target.resolve()
+            resolved.relative_to(root)
+        except (OSError, ValueError):
+            return PersistenceFailure(
+                stage="load",
+                code="INVALID_REQUEST",
+                message="The prediction identifier is not valid.",
+                cause="PathEscape",
+            )
+        if not target.is_file():
+            return PersistenceFailure(
+                stage="load",
+                code="FILE_NOT_FOUND",
+                message="No saved prediction exists for this identity.",
+                cause="FileNotFoundError",
+            )
+        try:
+            data = target.read_bytes()
+        except FileNotFoundError:
+            return PersistenceFailure(
+                stage="load",
+                code="FILE_NOT_FOUND",
+                message="No saved prediction exists for this identity.",
+                cause="FileNotFoundError",
+            )
+        except OSError as exc:
+            return PersistenceFailure(
+                stage="load",
+                code="LOAD_ERROR",
+                message="The saved prediction could not be read from disk.",
+                cause=type(exc).__name__,
+            )
+        try:
+            record: dict[str, Any] = json.loads(data.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            return PersistenceFailure(
+                stage="load",
+                code="CORRUPT_RECORD",
+                message="The saved prediction could not be read.",
+                cause=type(exc).__name__,
+            )
+        schema_v = record.get("schema_version")
+        if schema_v != SCHEMA_VERSION:
+            return PersistenceFailure(
+                stage="load",
+                code="UNSUPPORTED_SCHEMA",
+                message="The saved prediction uses an unsupported schema.",
+                cause="SchemaVersionError",
+            )
+        try:
+            run = deserialize_run(record)
+        except (KeyError, ValueError, TypeError) as exc:
+            return PersistenceFailure(
+                stage="load",
+                code="CORRUPT_RECORD",
+                message="The saved prediction could not be read.",
+                cause=type(exc).__name__,
+            )
+        if run.run_id != run_id:
+            return PersistenceFailure(
+                stage="load",
+                code="CORRUPT_RECORD",
+                message="The saved prediction could not be read.",
+                cause="IdentityMismatch",
+            )
+        return VerifiedPersistedPrediction(
+            ref=PersistedPredictionRef(
+                run_id=run.run_id,
+                file_path=str(resolved),
+                schema_version=SCHEMA_VERSION,
+                content_hash=_sha256_of(data),
+            ),
+            run=run,
+            created_at=record.get("created_at"),
+            document_hash=record.get("document_hash"),
+            system_fingerprint=record.get("system_fingerprint"),
+        )
 
     def save(
         self,

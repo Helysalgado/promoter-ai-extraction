@@ -145,6 +145,14 @@ Límites del bucle, fijos en código:
 
 `extract_property` no corre en la misma respuesta en la que se pidió `retrieve_evidence` para esa propiedad. El host espera a devolver el `tool_result` y a que el modelo pida la extracción en una ronda posterior.
 
+### `GET /predictions/{run_id}`
+
+Lee una predicción ya guardada en `PREDICTION_DIR`. No llama a FastEmbed, a un proveedor ni al extractor. No lista el directorio y no escribe el archivo.
+
+`run_id` es `paper_id__promoter_name`. Una barra, una barra invertida, dos puntos o `..` responden 422 `INVALID_REQUEST`. Si no hay archivo, 404 `FILE_NOT_FOUND`. El cuerpo 200 trae `properties` y, cuando la huella guardada los tiene, `agent` o `retrieval`. No trae la ruta del archivo.
+
+La página tiene el botón «Consultar resultado guardado». Usa el PMID/ID y el nombre del promotor. No pide el documento ni la confirmación de una llamada al proveedor.
+
 ## RAG local
 
 Solo en HTTP. El índice vive en memoria y solo para el documento de esa petición. El modelo de embeddings es `BAAI/bge-small-en-v1.5`, vía FastEmbed, y se carga en el primer uso, no al importar el paquete.
