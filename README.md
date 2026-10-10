@@ -98,7 +98,13 @@ uv run uvicorn promoter_ai_extraction.api:app --host 127.0.0.1 --port 8765
 
 El cliente envía el texto del documento. No envía una ruta de disco, una clave, un campo de gold ni el directorio de predicciones.
 
+Abre `http://127.0.0.1:8765/` para la página local. Esa página llama a los mismos POST. No carga un archivo `.env` ni muestra la clave.
+
 ## Endpoints
+
+### `GET /`
+
+Devuelve la página de extracción. El CSS y el JavaScript están en `/ui/app.css` y `/ui/app.js`. `/docs` no cambia.
 
 ### `GET /health`
 
@@ -197,7 +203,7 @@ La corrida del 2026-10-10 pasó 616 pruebas en 4.83 s. Esas pruebas usan dobles 
 - Normalizar una distancia anclada no demuestra que esa distancia sea el TSS.
 - El gold actual no sostiene una tasa completa de falsas afirmaciones ni una métrica de recuperación de segmentos.
 - El cupo de 8 herramientas cuenta también los rechazos. Cuatro recuperaciones y cuatro extracciones en la misma respuesta agotarían el cupo antes de una extracción válida.
-- No hay interfaz ni despliegue en esta rama.
+- La página local no hace benchmark, no muestra historial y no se despliega fuera de localhost.
 
 ## Ejemplos sintéticos
 

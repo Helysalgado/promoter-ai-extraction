@@ -2,7 +2,7 @@
 
 The client sends document text. It does not send a filesystem path, a
 credential, a gold field, or a prediction directory. Evaluation is not
-exposed here.
+exposed here. GET / serves the local page. Static assets live under /ui.
 
 POST /extract is deterministic. POST /agent/extract runs the Anthropic tool
 loop. Both routes share run_id. The first saved prediction keeps that id,
@@ -17,7 +17,8 @@ from typing import Literal
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from promoter_ai_extraction import __version__
@@ -304,6 +305,13 @@ def create_app(
                 return _error(500, "WRITE_ERROR", "The prediction could not be stored.")
         return JSONResponse(status_code=200, content=_public_agent_run(run, agent=trace))
 
+    ui_dir = Path(__file__).resolve().parent / "ui"
+
+    @app.get("/", include_in_schema=False)
+    def home() -> FileResponse:
+        return FileResponse(ui_dir / "index.html")
+
+    app.mount("/ui", StaticFiles(directory=ui_dir), name="ui")
     return app
 
 
